@@ -1,4 +1,5 @@
 import { myaiComplete, myaiCompleteJSON, MYAI_FIELDS } from './myaiClient'
+import { recallMemories, storeMemory, formatMemoriesForPrompt } from './memory'
 
 interface ToneAnalysis {
   isNeutral: boolean
@@ -10,6 +11,12 @@ interface ToneAnalysis {
 
 export async function analyzeTone(content: string): Promise<ToneAnalysis> {
   try {
+    const pastNotes = await recallMemories({
+      agentKey: 'AUDY',
+      category: 'editorial-style',
+      query: content,
+    }).catch(() => [])
+
     const result = await myaiCompleteJSON(MYAI_FIELDS.AUDY, [
       {
         role: 'system',
@@ -33,7 +40,9 @@ Respond with a JSON object containing:
 - emotionalWords: array of emotional/biased words found
 - accusatoryPhrases: array of accusatory phrases found
 - suggestions: array of improvement suggestions in Indonesian
-- rewrittenVersion: optional neutral rewrite of problematic sections`
+- rewrittenVersion: optional neutral rewrite of problematic sections
+
+Use the past style notes below (if any) to stay consistent with previous editorial guidance.${formatMemoriesForPrompt(pastNotes)}`
       },
       {
         role: 'user',
@@ -41,13 +50,25 @@ Respond with a JSON object containing:
       }
     ])
 
-    return {
+    const toneResult: ToneAnalysis = {
       isNeutral: result.isNeutral ?? true,
       emotionalWords: result.emotionalWords || [],
       accusatoryPhrases: result.accusatoryPhrases || [],
       suggestions: result.suggestions || [],
       rewrittenVersion: result.rewrittenVersion,
     }
+
+    // Only store non-neutral findings - a "this was fine" verdict isn't a
+    // useful precedent to recall later, only actual style violations are.
+    if (!toneResult.isNeutral && toneResult.emotionalWords.length + toneResult.accusatoryPhrases.length > 0) {
+      await storeMemory({
+        agentKey: 'AUDY',
+        category: 'editorial-style',
+        content: `Flagged non-neutral language: emotional words [${toneResult.emotionalWords.join(', ')}], accusatory phrases [${toneResult.accusatoryPhrases.join(', ')}]. Suggestions: ${toneResult.suggestions.join(' | ')}`,
+      }).catch(err => console.error('Failed to store tone memory:', err))
+    }
+
+    return toneResult
   } catch (error) {
     console.error('Tone analysis error:', error)
     return {
@@ -61,6 +82,12 @@ Respond with a JSON object containing:
 
 export async function suggestNeutralRewrite(content: string): Promise<string> {
   try {
+    const pastNotes = await recallMemories({
+      agentKey: 'AUDY',
+      category: 'editorial-style',
+      query: content,
+    }).catch(() => [])
+
     const result = await myaiComplete(MYAI_FIELDS.AUDY, [
       {
         role: 'system',
@@ -71,7 +98,7 @@ export async function suggestNeutralRewrite(content: string): Promise<string> {
 4. Free of emotional language
 5. Objective in tone
 
-Maintain all factual information while removing bias. Use Indonesian journalistic standards.`
+Maintain all factual information while removing bias. Use Indonesian journalistic standards.${formatMemoriesForPrompt(pastNotes)}`
       },
       {
         role: 'user',

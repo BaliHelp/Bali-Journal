@@ -1,4 +1,5 @@
 import { myaiCompleteJSON, MYAI_FIELDS } from './myaiClient'
+import { recallMemories, storeMemory, formatMemoriesForPrompt } from './memory'
 
 interface ModerationResult {
   flagged: boolean
@@ -17,6 +18,12 @@ interface ModerationResult {
 
 export async function moderateContent(content: string): Promise<ModerationResult> {
   try {
+    const pastDecisions = await recallMemories({
+      agentKey: 'AUDY',
+      category: 'moderation-precedent',
+      query: content,
+    }).catch(() => [])
+
     // Use LLM for moderation analysis
     const result = await myaiCompleteJSON(MYAI_FIELDS.AUDY, [
       {
@@ -40,7 +47,9 @@ Respond with a JSON object containing:
 Score thresholds:
 - 0.0-0.3: Safe
 - 0.3-0.7: Needs review
-- 0.7-1.0: Should reject`
+- 0.7-1.0: Should reject
+
+Use the past precedents below (if any) to stay consistent with how similar content was judged before.${formatMemoriesForPrompt(pastDecisions)}`
       },
       {
         role: 'user',
@@ -48,7 +57,7 @@ Score thresholds:
       }
     ])
 
-    return {
+    const moderationResult: ModerationResult = {
       flagged: result.flagged || false,
       categories: {
         hate: result.categories?.hate || 0,
@@ -62,6 +71,20 @@ Score thresholds:
       recommendation: result.recommendation || 'review',
       reason: result.reason || 'Content analyzed',
     }
+
+    // Only store review/reject cases as precedent - approved content is
+    // the routine case and would just bloat the table without adding
+    // useful signal for future judgment calls.
+    if (moderationResult.recommendation !== 'approve') {
+      await storeMemory({
+        agentKey: 'AUDY',
+        category: 'moderation-precedent',
+        content: `Content: "${content.slice(0, 200)}" -> ${moderationResult.recommendation} (${moderationResult.reason})`,
+        metadata: { recommendation: moderationResult.recommendation },
+      }).catch(err => console.error('Failed to store moderation memory:', err))
+    }
+
+    return moderationResult
   } catch (error) {
     console.error('Moderation error:', error)
     // Default to review on error

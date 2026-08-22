@@ -253,6 +253,24 @@ model ScheduleConfig {
   @@map("schedule_configs")
 }
 
+// Persistent memory for the newsroom AI agents (Wie/Audy/As/Wue) - DIY
+// replacement for a dedicated vector-memory service, backed by pgvector.
+// `embedding` is written/read via raw SQL ($queryRaw/$executeRaw) since
+// Prisma Client doesn't support the `vector` type through its normal API.
+model AgentMemory {
+  id        String                 @id @default(uuid())
+  agentKey  String                 // WIE, AUDY, AS, WUE
+  category  String?                // e.g. "legal-risk-decision", "moderation-precedent", "editorial-style"
+  content   String
+  embedding Unsupported("vector(384)")?
+  metadata  Json?
+  createdAt DateTime               @default(now())
+
+  @@index([agentKey])
+  @@index([category])
+  @@map("agent_memories")
+}
+
 // Contact Form Submissions
 model ContactSubmission {
   id        String   @id @default(cuid())

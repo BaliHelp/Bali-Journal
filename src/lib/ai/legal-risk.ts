@@ -1,5 +1,6 @@
 import { myaiCompleteJSON, MYAI_FIELDS } from './myaiClient'
 import { moderateContent } from './moderation'
+import { recallMemories, storeMemory, formatMemoriesForPrompt } from './memory'
 
 interface LegalRiskResult {
   riskScore: number // 0-100
@@ -18,6 +19,12 @@ interface LegalRiskResult {
 
 export async function analyzeLegalRisk(content: string, title: string): Promise<LegalRiskResult> {
   try {
+    const pastDecisions = await recallMemories({
+      agentKey: 'AUDY',
+      category: 'legal-risk-decision',
+      query: `${title}\n${content}`,
+    }).catch(() => []) // memory is a nice-to-have, never block the analysis on it
+
     const result = await myaiCompleteJSON(MYAI_FIELDS.AUDY, [
       {
         role: 'system',
@@ -41,7 +48,8 @@ Calculate an overall riskScore (0-100) and determine:
 - requiresLegalReview: Whether legal counsel should review before publication
 - recommendations: Array of actionable recommendations in Indonesian
 
-Respond ONLY with a JSON object.`
+Use the past decisions below (if any) to stay consistent with how similar cases were judged before.
+Respond ONLY with a JSON object.${formatMemoriesForPrompt(pastDecisions)}`
       },
       {
         role: 'user',
@@ -50,10 +58,21 @@ Respond ONLY with a JSON object.`
     ])
 
     const riskScore = Math.min(100, Math.max(0, result.riskScore || 0))
+    const riskLevel = getRiskLevelFromScore(riskScore)
+
+    // Awaited (not fire-and-forget) because serverless functions can be
+    // frozen/torn down right after the response is returned, which would
+    // silently drop an un-awaited write.
+    await storeMemory({
+      agentKey: 'AUDY',
+      category: 'legal-risk-decision',
+      content: `Title: "${title}" -> riskScore=${riskScore} (${riskLevel}), containsAccusation=${result.containsAccusation || false}. Reasoning basis: ${(result.recommendations || []).join(' | ') || 'n/a'}`,
+      metadata: { riskScore, riskLevel },
+    }).catch(err => console.error('Failed to store legal-risk memory:', err)) // don't fail the analysis if storage fails
 
     return {
       riskScore,
-      riskLevel: getRiskLevelFromScore(riskScore),
+      riskLevel,
       containsAccusation: result.containsAccusation || false,
       categories: {
         defamation: Math.min(100, Math.max(0, result.categories?.defamation || 0)),

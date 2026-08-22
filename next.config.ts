@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  serverExternalPackages: ["@xenova/transformers", "onnxruntime-node", "sharp"],
   images: {
     remotePatterns: [
       {
