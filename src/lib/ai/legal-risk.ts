@@ -1,4 +1,4 @@
-import { getZaiClient } from './zAiClient'
+import { myaiCompleteJSON, MYAI_FIELDS } from './myaiClient'
 import { moderateContent } from './moderation'
 
 interface LegalRiskResult {
@@ -18,12 +18,10 @@ interface LegalRiskResult {
 
 export async function analyzeLegalRisk(content: string, title: string): Promise<LegalRiskResult> {
   try {
-    const zai = await getZaiClient()
-    const response = await zai.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: `You are a legal risk assessment AI for Indonesian journalism. Analyze articles for potential legal risks under Indonesian law including:
+    const result = await myaiCompleteJSON(MYAI_FIELDS.AUDY, [
+      {
+        role: 'system',
+        content: `You are a legal risk assessment AI for Indonesian journalism. Analyze articles for potential legal risks under Indonesian law including:
 
 1.UU ITE (Information and Electronic Transactions Law) - Article 27(3) on defamation
 2. UU Pers (Press Law) - journalistic compliance
@@ -44,17 +42,12 @@ Calculate an overall riskScore (0-100) and determine:
 - recommendations: Array of actionable recommendations in Indonesian
 
 Respond ONLY with a JSON object.`
-        },
-        {
-          role: 'user',
-          content: `Analyze this article:\n\nTitle: ${title}\n\nContent:\n${content}`
-        }
-      ],
-      responseFormat: { type: 'json_object' },
-      temperature: 0.1,
-    })
-
-    const result = JSON.parse(response.choices[0].message.content)
+      },
+      {
+        role: 'user',
+        content: `Analyze this article:\n\nTitle: ${title}\n\nContent:\n${content}`
+      }
+    ])
 
     const riskScore = Math.min(100, Math.max(0, result.riskScore || 0))
 

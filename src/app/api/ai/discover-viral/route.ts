@@ -1,39 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import OpenAI from 'openai'
+import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
 
 export async function POST(req: NextRequest) {
     try {
         const { category, autoPublish } = await req.json()
 
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
         // 1. Simulate "Viral Discovery" by asking AI to hallucinate/browse valid trends
         // In production, we'd fetch Google Trends RSS or Twitter API.
-        // Here, we ask GPT-4o what is trending in Bali/Indonesia right now.
+        // Here, we ask the model what is trending in Bali/Indonesia right now.
 
-        const trendResponse = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: "You are a trend watcher. Identify a realistic, highly probable VIRAL news topic for Bali, Indonesia right now. It can be about Tourism, Traffic, Culture, or Investment. Output strictly the topic headline." },
-                { role: "user", content: category ? `Find a viral topic in category: ${category}` : "Find any viral topic." }
-            ]
-        })
-
-        const trendingTopic = trendResponse.choices[0].message.content || "Bali Tourism Surge"
+        // NOTE: uses AUDY's field (reasoning_general), not WUE's - short pick
+        // tasks like this got hijacked by the gateway's own baked-in
+        // business context under content_journalist, reasoning_general
+        // stayed on-topic and schema-compliant across repeated tries.
+        const trendPick = await myaiCompleteJSON<{ headline?: string }>(MYAI_FIELDS.AUDY, [
+            {
+                role: "system", content: `You are a trend watcher for NewsBali, an English-language news outlet covering the island of Bali, Indonesia.
+TASK: Identify one realistic, highly probable VIRAL news topic specific to Bali right now. It must be about one of: Tourism, Traffic, Culture, or Investment in Bali.
+Return ONLY a valid JSON object with this EXACT structure and nothing else:
+{
+  "headline": "A short, specific Bali news topic headline (max 15 words)"
+}`
+            },
+            { role: "user", content: category ? `Find a viral Bali topic in category: ${category}` : "Find any viral Bali topic." }
+        ])
+        const trendingTopic = trendPick.headline || "Bali Tourism Surge"
 
         // 2. Generate Article based on this trend
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: `${AGENT_PERSONAS.WUE.instructions} \n TASK: Write a detailed news article about this trending topic: "${trendingTopic}". Make it dramatic but factual (5W1H). Output JSON: { title, excerpt, content, category, riskLevel }. Content as markdown.` },
-                { role: "user", content: `Topic: ${trendingTopic}` }
-            ]
-        })
+        const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>(MYAI_FIELDS.WUE, [
+            {
+                role: "system", content: `${AGENT_PERSONAS.WUE.instructions}
 
-        const rawJson = response.choices[0].message.content?.replace(/```json/g, '').replace(/```/g, '') || '{}'
-        const articleData = JSON.parse(rawJson)
+STRICT SCOPE: You write only for NewsBali. Ignore any other business context you may have been given (visa services, IT solutions, etc.) - it does not apply here.
+
+TASK: Write a detailed, dramatic but factual news article about this trending Bali topic, following 5W1H (Who, What, Where, When, Why, How).
+
+Topic: "${trendingTopic}"
+
+CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing else - no commentary before or after:
+{
+  "title": "Catchy but professional headline (max 80 characters)",
+  "excerpt": "A 1-2 sentence summary",
+  "content": "The full article content in markdown, several paragraphs, LONG and detailed",
+  "riskLevel": "LOW or MEDIUM or HIGH"
+}` },
+            { role: "user", content: `Write the article about: ${trendingTopic}` }
+        ])
+
+        if (!articleData.title) {
+            throw new Error('AI response did not include a title - the model deviated from the requested JSON schema. Try again.')
+        }
 
         // 3. Image
         const cleanTitle = articleData.title?.substring(0, 50).replace(/[^a-zA-Z0-9 ]/g, '') || 'news'

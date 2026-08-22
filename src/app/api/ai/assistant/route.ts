@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // Force Rebuild
 import { db } from '@/lib/db'
 import { validateImageUrl } from '@/lib/ai/image-validator'
+import type { AgentKey } from '@/lib/ai/myaiClient'
 import { Status } from '@prisma/client'
 
 // Force dynamic to prevent caching issues
@@ -345,25 +346,12 @@ export async function POST(req: NextRequest) {
 
             // 1. Initialize Clients
             const { AGENT_PERSONAS } = await import('@/lib/ai/gemini-client')
-            const OpenAI = (await import('openai')).default
-
-            // Default OpenAI (for Wie/General) -> Use WIE key as default since typical OpenAI key is missing
-            const openai = new OpenAI({ apiKey: process.env.WIE_OPENAI_API_KEY })
-
-            // Specialized OpenAI for AS (Assistant) -> Use ASI key
-            const asOpenai = new OpenAI({
-                apiKey: process.env.ASI_OPENAI_API_KEY_ASISTANT
-            })
+            const { myaiComplete, myaiPing, MYAI_FIELDS } = await import('@/lib/ai/myaiClient')
 
             // 5. Connection Ping (Ping/Health Check)
             if (options?.ping) {
                 try {
-                    // Unified Ping: valid if OpenAI lists models.
-                    if (['AUDY', 'WUE', 'WIE'].includes(agentType)) {
-                        await openai.models.list()
-                    } else {
-                        await asOpenai.models.list()
-                    }
+                    await myaiPing()
                     // Randomize activity for "Dynamic" feel
                     const activities = ['Reviewing Logs', 'Monitoring Feeds', 'Checking Compliance', 'Organizing Schedule', 'Researching Leads']
                     const activity = activities[Math.floor(Math.random() * activities.length)]
@@ -376,50 +364,34 @@ export async function POST(req: NextRequest) {
                 }
             }
 
-            // --- AGENT EXECUTION (ALL OPENAI NOW) ---
+            // --- AGENT EXECUTION (ALL VIA MYAI OS GATEWAY) ---
 
             if (agentType === 'AUDY') {
-                const completion = await openai.chat.completions.create({
-                    model: "gpt-4o",
-                    messages: [
-                        { role: "system", content: `${AGENT_PERSONAS.AUDY.instructions} ${timeContext} You are LIVE and DYNAMIC.` },
-                        { role: "user", content: userCommand }
-                    ]
-                })
-                response = completion.choices[0].message.content || "Audy is present."
+                response = await myaiComplete(MYAI_FIELDS.AUDY, [
+                    { role: "system", content: `${AGENT_PERSONAS.AUDY.instructions} ${timeContext} You are LIVE and DYNAMIC.` },
+                    { role: "user", content: userCommand }
+                ]) || "Audy is present."
                 agent = "AUDY"
             }
             else if (agentType === 'AS') {
-                const completion = await asOpenai.chat.completions.create({
-                    model: "gpt-4o",
-                    messages: [
-                        { role: "system", content: `${AGENT_PERSONAS.AS.instructions} ${timeContext} You are LIVE and DYNAMIC. Check logs/schedule if asked.` },
-                        { role: "user", content: userCommand }
-                    ]
-                })
-                response = completion.choices[0].message.content || "I didn't catch that."
+                response = await myaiComplete(MYAI_FIELDS.AS, [
+                    { role: "system", content: `${AGENT_PERSONAS.AS.instructions} ${timeContext} You are LIVE and DYNAMIC. Check logs/schedule if asked.` },
+                    { role: "user", content: userCommand }
+                ]) || "I didn't catch that."
                 agent = "AS"
             }
             else if (agentType === 'WIE') {
-                const completion = await openai.chat.completions.create({
-                    model: "gpt-4o",
-                    messages: [
-                        { role: "system", content: `${AGENT_PERSONAS.WIE.instructions} ${timeContext} You are LIVE and DYNAMIC.` },
-                        { role: "user", content: userCommand }
-                    ]
-                })
-                response = completion.choices[0].message.content || "I'm working on it."
+                response = await myaiComplete(MYAI_FIELDS.WIE, [
+                    { role: "system", content: `${AGENT_PERSONAS.WIE.instructions} ${timeContext} You are LIVE and DYNAMIC.` },
+                    { role: "user", content: userCommand }
+                ]) || "I'm working on it."
                 agent = "WIE"
             }
             else if (agentType === 'WUE') {
-                const completion = await openai.chat.completions.create({
-                    model: "gpt-4o",
-                    messages: [
-                        { role: "system", content: `${AGENT_PERSONAS.WUE.instructions} ${timeContext} You are LIVE and DYNAMIC.` },
-                        { role: "user", content: userCommand }
-                    ]
-                })
-                response = completion.choices[0].message.content || "On it."
+                response = await myaiComplete(MYAI_FIELDS.WUE, [
+                    { role: "system", content: `${AGENT_PERSONAS.WUE.instructions} ${timeContext} You are LIVE and DYNAMIC.` },
+                    { role: "user", content: userCommand }
+                ]) || "On it."
                 agent = "WUE"
             }
             else if (agentType === 'GROUP') {
@@ -431,44 +403,31 @@ export async function POST(req: NextRequest) {
                     const targetAgent = mentionMatch[1].toUpperCase()
                     // Only specific agent responds
                     if (['AUDY', 'AS', 'WIE', 'WUE'].includes(targetAgent)) {
-                        let targetOpenAI = openai
-                        if (targetAgent === 'AS') targetOpenAI = asOpenai
-
-                        const completion = await targetOpenAI.chat.completions.create({
-                            model: "gpt-4o",
-                            messages: [
-                                { role: "system", content: `${(AGENT_PERSONAS as any)[targetAgent].instructions} ${timeContext} The Boss mentioned you specifically.` },
-                                { role: "user", content: userCommand }
-                            ]
-                        })
-                        messages.push({ role: 'assistant', content: completion.choices[0].message.content || "Thinking...", agent: targetAgent })
+                        const text = await myaiComplete(MYAI_FIELDS[targetAgent as AgentKey], [
+                            { role: "system", content: `${(AGENT_PERSONAS as any)[targetAgent].instructions} ${timeContext} The Boss mentioned you specifically.` },
+                            { role: "user", content: userCommand }
+                        ])
+                        messages.push({ role: 'assistant', content: text || "Thinking...", agent: targetAgent })
                     }
                 } else {
                     // 1. AS (Assistant) responds first (Facilitator)
-                    const asResponse = await asOpenai.chat.completions.create({
-                        model: "gpt-4o",
-                        messages: [
-                            { role: "system", content: `${AGENT_PERSONAS.AS.instructions} ${timeContext} Function: Facilitate a transparent group discussion.` },
-                            { role: "user", content: userCommand }
-                        ]
-                    })
-                    const asText = asResponse.choices[0].message.content || ""
+                    const asText = await myaiComplete(MYAI_FIELDS.AS, [
+                        { role: "system", content: `${AGENT_PERSONAS.AS.instructions} ${timeContext} Function: Facilitate a transparent group discussion.` },
+                        { role: "user", content: userCommand }
+                    ]) || ""
                     messages.push({ role: 'assistant', content: asText, agent: 'AS' })
 
                     // 2. Select another agent to chime in based on keywords
-                    let chimeInAgent = 'WUE' // Default to reporter
+                    let chimeInAgent: AgentKey = 'WUE' // Default to reporter
                     if (cmd.includes('risk') || cmd.includes('legal') || cmd.includes('safe')) chimeInAgent = 'AUDY'
                     if (cmd.includes('deep') || cmd.includes('investigate') || cmd.includes('history')) chimeInAgent = 'WIE'
 
-                    if (chimeInAgent !== 'AS') {
-                        const chimeResponse = await openai.chat.completions.create({
-                            model: "gpt-4o",
-                            messages: [
-                                { role: "system", content: `${(AGENT_PERSONAS as any)[chimeInAgent].instructions} ${timeContext}` },
-                                { role: "user", content: `Context: Boss said "${userCommand}". As said "${asText}". Add your distinct perspective.` }
-                            ]
-                        })
-                        messages.push({ role: 'assistant', content: chimeResponse.choices[0].message.content || "...", agent: chimeInAgent })
+                    if ((chimeInAgent as string) !== 'AS') {
+                        const chimeText = await myaiComplete(MYAI_FIELDS[chimeInAgent], [
+                            { role: "system", content: `${(AGENT_PERSONAS as any)[chimeInAgent].instructions} ${timeContext}` },
+                            { role: "user", content: `Context: Boss said "${userCommand}". As said "${asText}". Add your distinct perspective.` }
+                        ])
+                        messages.push({ role: 'assistant', content: chimeText || "...", agent: chimeInAgent })
                     }
                 }
 
@@ -477,14 +436,10 @@ export async function POST(req: NextRequest) {
             }
             else {
                 // Fallback to AS
-                const completion = await asOpenai.chat.completions.create({
-                    model: "gpt-4o",
-                    messages: [
-                        { role: "system", content: `${AGENT_PERSONAS.AS.instructions} ${timeContext}` },
-                        { role: "user", content: userCommand }
-                    ]
-                })
-                response = completion.choices[0].message.content || "I didn't catch that."
+                response = await myaiComplete(MYAI_FIELDS.AS, [
+                    { role: "system", content: `${AGENT_PERSONAS.AS.instructions} ${timeContext}` },
+                    { role: "user", content: userCommand }
+                ]) || "I didn't catch that."
                 agent = "AS"
             }
             // AFTER Response

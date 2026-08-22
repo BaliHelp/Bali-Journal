@@ -1,4 +1,4 @@
-import { getZaiClient } from './zAiClient'
+import { myaiComplete, myaiCompleteJSON, MYAI_FIELDS } from './myaiClient'
 
 interface ToneAnalysis {
   isNeutral: boolean
@@ -10,12 +10,10 @@ interface ToneAnalysis {
 
 export async function analyzeTone(content: string): Promise<ToneAnalysis> {
   try {
-    const zai = await getZaiClient()
-    const response = await zai.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: `You are a journalistic tone analyzer for an investigative news platform. Your job is to ensure articles follow evidence-first, neutral journalism standards.
+    const result = await myaiCompleteJSON(MYAI_FIELDS.AUDY, [
+      {
+        role: 'system',
+        content: `You are a journalistic tone analyzer for an investigative news platform. Your job is to ensure articles follow evidence-first, neutral journalism standards.
 
 Analyze the content for:
 1. Emotional adjectives that suggest bias
@@ -36,17 +34,12 @@ Respond with a JSON object containing:
 - accusatoryPhrases: array of accusatory phrases found
 - suggestions: array of improvement suggestions in Indonesian
 - rewrittenVersion: optional neutral rewrite of problematic sections`
-        },
-        {
-          role: 'user',
-          content: `Analyze the journalistic tone of this content:\n\n${content}`
-        }
-      ],
-      responseFormat: { type: 'json_object' },
-      temperature: 0.2,
-    })
-
-    const result = JSON.parse(response.choices[0].message.content)
+      },
+      {
+        role: 'user',
+        content: `Analyze the journalistic tone of this content:\n\n${content}`
+      }
+    ])
 
     return {
       isNeutral: result.isNeutral ?? true,
@@ -68,12 +61,10 @@ Respond with a JSON object containing:
 
 export async function suggestNeutralRewrite(content: string): Promise<string> {
   try {
-    const zai = await getZaiClient()
-    const response = await zai.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert editor for investigative journalism. Rewrite the given content to be:
+    const result = await myaiComplete(MYAI_FIELDS.AUDY, [
+      {
+        role: 'system',
+        content: `You are an expert editor for investigative journalism. Rewrite the given content to be:
 1. Factually neutral
 2. Evidence-based
 3. Properly attributed
@@ -81,16 +72,14 @@ export async function suggestNeutralRewrite(content: string): Promise<string> {
 5. Objective in tone
 
 Maintain all factual information while removing bias. Use Indonesian journalistic standards.`
-        },
-        {
-          role: 'user',
-          content: `Rewrite this content in a neutral, journalistic tone:\n\n${content}`
-        }
-      ],
-      temperature: 0.3,
-    })
+      },
+      {
+        role: 'user',
+        content: `Rewrite this content in a neutral, journalistic tone:\n\n${content}`
+      }
+    ])
 
-    return response.choices[0].message.content
+    return result || content
   } catch (error) {
     console.error('Rewrite error:', error)
     return content

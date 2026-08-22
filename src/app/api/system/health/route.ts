@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import OpenAI from 'openai'
+import { myaiPing } from '@/lib/ai/myaiClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,12 +20,9 @@ export async function GET() {
         dbStatus = 'error'
     }
 
-    // 2. Check OpenAI
+    // 2. Check MyAI OS Gateway
     try {
-        const openai = new OpenAI({
-            apiKey: process.env.WIE_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-        })
-        await openai.models.list()
+        await myaiPing()
         aiStatus = 'connected'
     } catch (e) {
         console.error('Health Check - AI Error:', e)

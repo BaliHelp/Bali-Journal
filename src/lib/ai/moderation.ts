@@ -1,4 +1,4 @@
-import { getZaiClient } from './zAiClient'
+import { myaiCompleteJSON, MYAI_FIELDS } from './myaiClient'
 
 interface ModerationResult {
   flagged: boolean
@@ -18,13 +18,11 @@ interface ModerationResult {
 export async function moderateContent(content: string): Promise<ModerationResult> {
   try {
     // Use LLM for moderation analysis
-    const zai = await getZaiClient()
-    const response = await zai.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: `You are a content moderation AI for an Indonesian news platform. Analyze the following content for:
-          
+    const result = await myaiCompleteJSON(MYAI_FIELDS.AUDY, [
+      {
+        role: 'system',
+        content: `You are a content moderation AI for an Indonesian news platform. Analyze the following content for:
+
 1. Hate speech (ucapan kebencian)
 2. Harassment (pelecehan)
 3. Violence (kekerasan)
@@ -43,17 +41,12 @@ Score thresholds:
 - 0.0-0.3: Safe
 - 0.3-0.7: Needs review
 - 0.7-1.0: Should reject`
-        },
-        {
-          role: 'user',
-          content: `Analyze this content:\n\n${content}`
-        }
-      ],
-      responseFormat: { type: 'json_object' },
-      temperature: 0.1,
-    })
-
-    const result = JSON.parse(response.choices[0].message.content)
+      },
+      {
+        role: 'user',
+        content: `Analyze this content:\n\n${content}`
+      }
+    ])
 
     return {
       flagged: result.flagged || false,

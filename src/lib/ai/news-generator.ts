@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { db } from '@/lib/db'
 import { Category, RiskLevel, Verification, Status } from '@prisma/client'
 import { validateImageUrl } from '@/lib/ai/image-validator'
@@ -97,27 +97,16 @@ async function generateArticleContent(category: Category): Promise<GeneratedArti
     `
 
     try {
-        const openai = new OpenAI({
-            apiKey: process.env.WIE_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-        })
-
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o', // Upgraded to 4o for quality
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You are an award-winning journalist. Output strictly valid JSON.'
-                },
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.7, // Lower temperature for more factual/grounded output
-        })
-
-        const result = JSON.parse(response.choices[0].message.content || '{}')
+        const result = await myaiCompleteJSON(MYAI_FIELDS.WIE, [
+            {
+                role: 'system',
+                content: 'You are an award-winning journalist. Output strictly valid JSON.'
+            },
+            {
+                role: 'user',
+                content: prompt
+            }
+        ])
 
         return {
             title: result.title,
