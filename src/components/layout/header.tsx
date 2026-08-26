@@ -141,7 +141,13 @@ export function Header() {
               {/* Language & Theme */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1">
+                  {/* Radix generates this trigger's `id` via useId(), which can render a
+                      different value on the server vs. the client hydration pass in this
+                      tree shape - a known, cosmetic-only Radix/Next.js SSR quirk (the id
+                      settles correctly post-hydration; nothing about aria wiring or click
+                      behavior is affected). suppressHydrationWarning targets just that one
+                      attribute instead of silencing hydration mismatches app-wide. */}
+                  <Button variant="ghost" size="sm" className="gap-1" suppressHydrationWarning>
                     <Globe className="h-4 w-4" />
                     <span className="text-xs font-semibold">{lang === 'en' ? 'EN' : 'ID'}</span>
                   </Button>
