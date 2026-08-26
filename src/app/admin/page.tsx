@@ -206,6 +206,7 @@ interface AdRow {
   id: string
   slotId: string
   slot: AdSlotRow
+  advertiserId: string | null
   advertiserName: string
   mediaUrl: string
   mediaType: 'IMAGE' | 'VIDEO'
@@ -213,6 +214,7 @@ interface AdRow {
   startDate: string
   endDate: string
   isActive: boolean
+  invoice: { id: string; invoiceNumber: string; amount: number; status: string } | null
 }
 
 interface Article {
@@ -324,21 +326,25 @@ export default function MasterAdminDashboard() {
   const [showAdSlotDialog, setShowAdSlotDialog] = useState(false)
   const [showAdDialog, setShowAdDialog] = useState(false)
   const [adSlotForm, setAdSlotForm] = useState({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90, pricePerDay: '' })
-  const [adForm, setAdForm] = useState({ slotId: '', advertiserName: '', linkUrl: '', startDate: '', endDate: '' })
+  const [adForm, setAdForm] = useState({ slotId: '', advertiserId: '', advertiserName: '', linkUrl: '', startDate: '', endDate: '', invoiceAmount: '' })
   const [adFile, setAdFile] = useState<File | null>(null)
   const [adsLoading, setAdsLoading] = useState(false)
+  const [approvedAdvertisers, setApprovedAdvertisers] = useState<AdvertiserRow[]>([])
 
   async function fetchAdsData() {
     setAdsLoading(true)
     try {
-      const [slotsRes, adsRes] = await Promise.all([
+      const [slotsRes, adsRes, advertisersRes] = await Promise.all([
         fetch('/api/admin/ad-slots'),
         fetch('/api/admin/ads'),
+        fetch('/api/admin/advertisers?status=APPROVED'),
       ])
       const slotsData = slotsRes.ok ? await slotsRes.json() : { slots: [] }
       const adsData = adsRes.ok ? await adsRes.json() : { ads: [] }
+      const advertisersData = advertisersRes.ok ? await advertisersRes.json() : { advertisers: [] }
       if (Array.isArray(slotsData.slots)) setAdSlots(slotsData.slots)
       if (Array.isArray(adsData.ads)) setAds(adsData.ads)
+      if (Array.isArray(advertisersData.advertisers)) setApprovedAdvertisers(advertisersData.advertisers)
     } catch (err) {
       console.error('Error fetching ads data:', err)
     } finally {
@@ -395,7 +401,12 @@ export default function MasterAdminDashboard() {
     try {
       const formData = new FormData()
       formData.append('slotId', adForm.slotId)
-      formData.append('advertiserName', adForm.advertiserName)
+      if (adForm.advertiserId) {
+        formData.append('advertiserId', adForm.advertiserId)
+        if (adForm.invoiceAmount) formData.append('invoiceAmount', adForm.invoiceAmount)
+      } else {
+        formData.append('advertiserName', adForm.advertiserName)
+      }
       formData.append('linkUrl', adForm.linkUrl)
       formData.append('startDate', adForm.startDate)
       formData.append('endDate', adForm.endDate)
@@ -404,9 +415,9 @@ export default function MasterAdminDashboard() {
       const res = await fetch('/api/admin/ads', { method: 'POST', body: formData })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to create ad')
-      setSuccess('Ad created!')
+      setSuccess(adForm.advertiserId ? 'Ad & invoice created!' : 'Ad created!')
       setShowAdDialog(false)
-      setAdForm({ slotId: '', advertiserName: '', linkUrl: '', startDate: '', endDate: '' })
+      setAdForm({ slotId: '', advertiserId: '', advertiserName: '', linkUrl: '', startDate: '', endDate: '', invoiceAmount: '' })
       setAdFile(null)
       fetchAdsData()
     } catch (err) {
@@ -1795,13 +1806,35 @@ export default function MasterAdminDashboard() {
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label>Nama Advertiser</Label>
-                            <Input
-                              value={adForm.advertiserName}
-                              onChange={(e) => setAdForm({ ...adForm, advertiserName: e.target.value })}
-                              required
-                            />
+                            <Label>Untuk Advertiser (opsional)</Label>
+                            <Select
+                              value={adForm.advertiserId || '_house'}
+                              onValueChange={(v) => setAdForm({ ...adForm, advertiserId: v === '_house' ? '' : v })}
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_house">- (House Ad, tanpa invoice)</SelectItem>
+                                {approvedAdvertisers.map((a) => (
+                                  <SelectItem key={a.id} value={a.id}>{a.companyName}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              {adForm.advertiserId
+                                ? 'Iklan dibuat non-aktif dan invoice UNPAID otomatis dibuat - verifikasi di tab Invoices untuk mengaktifkan.'
+                                : 'House ad langsung aktif, tanpa invoice, dikelola admin sepenuhnya.'}
+                            </p>
                           </div>
+                          {!adForm.advertiserId && (
+                            <div className="space-y-2">
+                              <Label>Nama Advertiser</Label>
+                              <Input
+                                value={adForm.advertiserName}
+                                onChange={(e) => setAdForm({ ...adForm, advertiserName: e.target.value })}
+                                required
+                              />
+                            </div>
+                          )}
                           <div className="space-y-2">
                             <Label>Link Tujuan (opsional)</Label>
                             <Input
@@ -1831,6 +1864,29 @@ export default function MasterAdminDashboard() {
                               />
                             </div>
                           </div>
+                          {adForm.advertiserId && (() => {
+                            const slot = adSlots.find((s) => s.id === adForm.slotId)
+                            const days =
+                              adForm.startDate && adForm.endDate
+                                ? Math.max(1, Math.ceil((new Date(adForm.endDate).getTime() - new Date(adForm.startDate).getTime()) / (24 * 60 * 60 * 1000)))
+                                : 0
+                            const suggested = slot?.pricePerDay && days > 0 ? slot.pricePerDay * days : null
+                            return (
+                              <div className="space-y-2">
+                                <Label>Nominal Invoice (Rp){slot?.pricePerDay == null && ' - wajib diisi, slot tidak punya harga default'}</Label>
+                                <Input
+                                  type="number"
+                                  value={adForm.invoiceAmount}
+                                  onChange={(e) => setAdForm({ ...adForm, invoiceAmount: e.target.value })}
+                                  placeholder={suggested ? `Saran: ${suggested}` : 'Masukkan nominal'}
+                                  required={slot?.pricePerDay == null}
+                                />
+                                {suggested && !adForm.invoiceAmount && (
+                                  <p className="text-xs text-muted-foreground">Kosongkan untuk pakai saran otomatis ({suggested}).</p>
+                                )}
+                              </div>
+                            )
+                          })()}
                           <div className="space-y-2">
                             <Label>File (gambar atau video .webm/.mp4)</Label>
                             <Input
@@ -1856,6 +1912,7 @@ export default function MasterAdminDashboard() {
                         <TableHead>Slot</TableHead>
                         <TableHead>Tipe</TableHead>
                         <TableHead>Periode</TableHead>
+                        <TableHead>Invoice</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Aksi</TableHead>
                       </TableRow>
@@ -1863,11 +1920,28 @@ export default function MasterAdminDashboard() {
                     <TableBody>
                       {ads.map((ad) => (
                         <TableRow key={ad.id}>
-                          <TableCell className="font-medium">{ad.advertiserName}</TableCell>
+                          <TableCell className="font-medium">
+                            {ad.advertiserName}
+                            {ad.advertiserId && <Badge variant="outline" className="ml-2 text-xs">self-service</Badge>}
+                          </TableCell>
                           <TableCell>{ad.slot?.name}</TableCell>
                           <TableCell>{ad.mediaType}</TableCell>
                           <TableCell className="text-xs">
                             {new Date(ad.startDate).toLocaleDateString('id-ID')} - {new Date(ad.endDate).toLocaleDateString('id-ID')}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {ad.invoice ? (
+                              <>
+                                <Badge variant={ad.invoice.status === 'PAID' ? 'default' : ad.invoice.status === 'REJECTED' ? 'destructive' : 'secondary'}>
+                                  {ad.invoice.status}
+                                </Badge>
+                                <div className="text-muted-foreground mt-1">
+                                  {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(ad.invoice.amount)}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -1887,7 +1961,7 @@ export default function MasterAdminDashboard() {
                       ))}
                       {ads.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                             {adsLoading ? 'Loading...' : 'Belum ada iklan.'}
                           </TableCell>
                         </TableRow>

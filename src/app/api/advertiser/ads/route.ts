@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdvertiser } from '@/lib/ads/auth'
 import { storeAdMedia } from '@/lib/ads/media'
-
-function generateInvoiceNumber(): string {
-  const date = new Date()
-  const stamp = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`
-  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase()
-  return `INV-${stamp}-${suffix}`
-}
+import { generateInvoiceNumber } from '@/lib/ads/invoice'
 
 export async function GET() {
   const ctx = await requireAdvertiser()
