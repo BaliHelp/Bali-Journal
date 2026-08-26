@@ -110,7 +110,7 @@ async function generateArticleContent(category: Category, avoidTitles: string[] 
         ? `\n\nALREADY COVERED - DO NOT repeat these topics/angles, pick something genuinely different:\n${avoidTitles.map((t) => `- "${t}"`).join('\n')}\n`
         : ''
 
-    const prompt = `You are a Senior Investigative Journalist for NewsBali, a prestigious English-language news outlet in Indonesia.
+    const prompt = `You are a Senior Investigative Journalist for Bali Journal, a prestigious English-language news outlet in Indonesia.
 
     TASK: Write a comprehensive, high-quality news article based on REAL or HIGHLY REALISTIC CURRENT TRENDS in Bali.
 

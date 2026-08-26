@@ -97,7 +97,7 @@ export function Header() {
         <Link href="/" className="flex items-center space-x-2">
           <div className="flex flex-col">
             <span className="text-xl font-bold tracking-tight text-foreground">
-              News<span className="text-primary">Bali</span>
+              Bali <span className="text-primary">Journal</span>
             </span>
             <span className="text-[10px] text-muted-foreground -mt-1">
               {t.tagline}

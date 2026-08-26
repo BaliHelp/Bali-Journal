@@ -65,7 +65,7 @@ export async function generateMetadata({ params }: CategoryPageProps) {
   }
 
   return {
-    title: `${categoryLabels[category]} - NewsBali Online`,
+    title: `${categoryLabels[category]} - Bali Journal`,
     description: categoryDescriptions[category],
   }
 }

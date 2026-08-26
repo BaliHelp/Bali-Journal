@@ -26,7 +26,7 @@ export default async function TransparencyPage() {
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold mb-4">Transparency</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            NewsBali Online is committed to full transparency in editorial processes, 
+            Bali Journal is committed to full transparency in editorial processes, 
             funding, and platform governance.
           </p>
         </div>
@@ -180,7 +180,7 @@ export default async function TransparencyPage() {
               </div>
               <Separator />
               <p className="text-sm text-muted-foreground">
-                NewsBali Online is an independent platform funded entirely by reader donations. 
+                Bali Journal is an independent platform funded entirely by reader donations. 
                 We do not accept ads or sponsorships from third parties to maintain editorial independence.
               </p>
             </div>
@@ -197,7 +197,7 @@ export default async function TransparencyPage() {
               For questions about transparency or editorial claims:
             </p>
             <div className="space-y-1">
-              <p className="text-sm"><strong>Email:</strong> editorial@newsbali.online</p>
+              <p className="text-sm"><strong>Email:</strong> editorial@balijournal.com</p>
               <p className="text-sm"><strong>Phone:</strong> +62 361 XXX XXXX</p>
               <p className="text-sm"><strong>Address:</strong> Denpasar, Bali, Indonesia</p>
             </div>

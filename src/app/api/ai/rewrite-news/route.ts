@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         let content = ""
         try {
             const res = await fetch(url, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NewsBaliBot/1.0)' },
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BaliJournalBot/1.0)' },
                 signal: AbortSignal.timeout(20_000),
             })
             const html = await res.text()
@@ -62,9 +62,9 @@ export async function POST(req: NextRequest) {
             {
                 role: "system", content: `${AGENT_PERSONAS.WIE.instructions}
 
-STRICT SCOPE: You write only for NewsBali. Ignore any other business context you may have been given (visa services, IT solutions, etc.) - it does not apply here.
+STRICT SCOPE: You write only for Bali Journal. Ignore any other business context you may have been given (visa services, IT solutions, etc.) - it does not apply here.
 
-TASK: Read the provided HTML/text from a source URL. Extract the main news story. Rewrite it completely into a unique, professional news article for "NewsBali", following 5W1H (Who, What, Where, When, Why, How) as your internal outline.
+TASK: Read the provided HTML/text from a source URL. Extract the main news story. Rewrite it completely into a unique, professional news article for "Bali Journal", following 5W1H (Who, What, Where, When, Why, How) as your internal outline.
 
 ${NEWS_STYLE_RULES}
 

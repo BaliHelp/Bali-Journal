@@ -9,6 +9,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { AdSlot } from '@/components/ads/ad-slot'
 import { RotatingAdSlot } from '@/components/ads/rotating-ad-slot'
 import { PlaceAdsCTA } from '@/components/ads/place-ads-cta'
+import { OrganizationJsonLd, WebsiteJsonLd } from '@/components/seo/article-json-ld'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -16,31 +17,31 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://newsbali.online'),
+  metadataBase: new URL('https://www.balijournal.com'),
   title: {
-    default: 'NewsBali Online - Independent Investigative Journalism',
-    template: '%s | NewsBali Online',
+    default: 'Bali Journal - Independent Investigative Journalism',
+    template: '%s | Bali Journal',
   },
   description: 'Bali\'s premier independent investigative journalism platform. Delivering evidence-based news on Tourism, Investment, Incidents, and Local affairs in Bali, Indonesia.',
-  keywords: ['Bali news', 'Investigative Journalism', 'Bali Tourism', 'Bali Investment', 'Canggu News', 'Bali Safety', 'Travel Advice Bali', 'NewsBali'],
-  authors: [{ name: 'NewsBali Team' }],
-  creator: 'NewsBali Media',
-  publisher: 'NewsBali Media',
+  keywords: ['Bali news', 'Investigative Journalism', 'Bali Tourism', 'Bali Investment', 'Canggu News', 'Bali Safety', 'Travel Advice Bali', 'Bali Journal'],
+  authors: [{ name: 'Bali Journal Team' }],
+  creator: 'Bali Journal Media',
+  publisher: 'Bali Journal Media',
   icons: {
     icon: '/Logo.webp',
     apple: '/Logo.webp',
   },
   openGraph: {
-    title: 'NewsBali Online',
+    title: 'Bali Journal',
     description: 'Investigative Journalism Platform for Bali',
-    url: 'https://newsbali.online',
-    siteName: 'NewsBali Online',
+    url: 'https://www.balijournal.com',
+    siteName: 'Bali Journal',
     images: [
       {
         url: '/opengraph-image', // Dynamic OG Image
         width: 1200,
         height: 630,
-        alt: 'NewsBali Online Cover',
+        alt: 'Bali Journal Cover',
       },
     ],
     type: 'website',
@@ -48,10 +49,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NewsBali Online',
+    title: 'Bali Journal',
     description: 'Independent news from Bali, Indonesia.',
     images: ['/opengraph-image'],
-    creator: '@newsbali',
+    creator: '@balijournal',
   },
   robots: {
     index: true,
@@ -74,6 +75,8 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased bg-background text-foreground font-sans`} suppressHydrationWarning>
+        <OrganizationJsonLd />
+        <WebsiteJsonLd />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <div className="min-h-screen flex flex-col">
             <Header />

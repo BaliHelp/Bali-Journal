@@ -87,11 +87,11 @@ export async function POST(req: NextRequest) {
                         viewCount: viewCount,
                         featuredImageUrl: `https://placehold.co/600x400?text=${t.category}+Archive`, // Placeholder for backfill
                         featuredImageAlt: "Archived News",
-                        imageSource: "NewsBali Archive",
+                        imageSource: "Bali Journal Archive",
                         author: {
                             connectOrCreate: {
-                                where: { email: 'archive@newsbali.online' },
-                                create: { email: 'archive@newsbali.online', name: 'System Archive', role: 'ADMIN' }
+                                where: { email: 'archive@balijournal.com' },
+                                create: { email: 'archive@balijournal.com', name: 'System Archive', role: 'ADMIN' }
                             }
                         }
                     }

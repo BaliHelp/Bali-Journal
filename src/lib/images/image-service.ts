@@ -2,7 +2,7 @@ import fs from 'fs/promises'
 import path from 'path'
 
 /**
- * Centralised image pipeline for NewsBali.
+ * Centralised image pipeline for Bali Journal.
  *
  * Generates an image via an external generator (Pollinations -> LoremFlickr
  * fallback), VERIFIES the binary response (content-type + minimum size),

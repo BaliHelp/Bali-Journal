@@ -1,3 +1,5 @@
+import { SITE_NAME, SITE_URL, SITE_DOMAIN, COMPANY_NAME, COMPANY_SHORT_NAME } from '@/lib/site-config'
+
 interface Article {
   id: string
   title: string
@@ -15,6 +17,21 @@ interface ArticleJsonLdProps {
   article: Article
 }
 
+// Bali Journal operates under (is a division of) PT Indonesia Oncharge
+// Advertising - expressed via schema.org's parentOrganization property so
+// it's machine-readable wherever the publisher/organization is declared.
+const PARENT_ORGANIZATION = {
+  '@type': 'Organization',
+  name: COMPANY_NAME,
+  alternateName: COMPANY_SHORT_NAME,
+}
+
+const BALI_ADDRESS = {
+  '@type': 'PostalAddress',
+  addressRegion: 'Bali',
+  addressCountry: 'ID',
+}
+
 export function ArticleJsonLd({ article }: ArticleJsonLdProps) {
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -26,19 +43,21 @@ export function ArticleJsonLd({ article }: ArticleJsonLdProps) {
     dateModified: article.publishedAt?.toISOString(),
     author: {
       '@type': 'Person',
-      name: article.author?.name || 'Tim NewsBali',
+      name: article.author?.name || `Tim ${SITE_NAME}`,
     },
     publisher: {
       '@type': 'Organization',
-      name: 'NewsBali Online',
+      name: SITE_NAME,
+      parentOrganization: PARENT_ORGANIZATION,
+      address: BALI_ADDRESS,
       logo: {
         '@type': 'ImageObject',
-        url: 'https://newsbali.online/logo.svg',
+        url: `${SITE_URL}/logo.svg`,
       },
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `https://newsbali.online/article/${article.slug}`,
+      '@id': `${SITE_URL}/article/${article.slug}`,
     },
     articleSection: article.category,
     inLanguage: 'en',
@@ -56,11 +75,11 @@ export function WebsiteJsonLd() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'NewsBali Online',
-    url: 'https://newsbali.online',
+    name: SITE_NAME,
+    url: SITE_URL,
     potentialAction: {
       '@type': 'SearchAction',
-      target: 'https://newsbali.online/search?q={search_term_string}',
+      target: `${SITE_URL}/search?q={search_term_string}`,
       'query-input': 'required name=search_term_string',
     },
   }
@@ -77,18 +96,25 @@ export function OrganizationJsonLd() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'NewsMediaOrganization',
-    name: 'NewsBali Online',
-    url: 'https://newsbali.online',
-    logo: 'https://newsbali.online/logo.svg',
+    name: SITE_NAME,
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo.svg`,
+    parentOrganization: PARENT_ORGANIZATION,
+    address: BALI_ADDRESS,
+    areaServed: {
+      '@type': 'AdministrativeArea',
+      name: 'Bali',
+    },
     sameAs: [
-      'https://facebook.com/newsbali',
-      'https://twitter.com/newsbali',
-      'https://instagram.com/newsbali',
+      'https://facebook.com/balijournal',
+      'https://twitter.com/balijournal',
+      'https://instagram.com/balijournal',
     ],
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'customer service',
-      email: 'kontak@newsbali.online',
+      email: `kontak@${SITE_DOMAIN}`,
+      areaServed: 'ID',
     },
   }
 

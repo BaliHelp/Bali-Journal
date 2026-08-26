@@ -4,7 +4,7 @@ import { ImageResponse } from 'next/og'
 export const runtime = 'edge'
 
 // Image metadata
-export const alt = 'NewsBali Online - Investigative Journalism'
+export const alt = 'Bali Journal - Investigative Journalism'
 export const size = {
     width: 1200,
     height: 630,
@@ -59,7 +59,7 @@ export default async function Image() {
                     }}>
                         NB
                     </div>
-                    <h1 style={{ fontSize: '80px', fontWeight: 'bold', margin: 0, letterSpacing: '-2px' }}>NewsBali</h1>
+                    <h1 style={{ fontSize: '80px', fontWeight: 'bold', margin: 0, letterSpacing: '-2px' }}>Bali Journal</h1>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

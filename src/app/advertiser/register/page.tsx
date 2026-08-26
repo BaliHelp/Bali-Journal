@@ -66,7 +66,7 @@ export default function AdvertiserRegisterPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Daftar Sebagai Pengiklan</CardTitle>
           <CardDescription>
-            Pasang iklan Anda di NewsBali Online
+            Pasang iklan Anda di Bali Journal
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

@@ -138,7 +138,7 @@ export default async function HomePage() {
                         {featuredArticle.excerpt}
                       </p>
                       <div className="flex items-center gap-4 text-xs md:text-sm text-white/70">
-                        <span className="font-medium text-white">{featuredArticle.author?.name || 'NewsBali Team'}</span>
+                        <span className="font-medium text-white">{featuredArticle.author?.name || 'Bali Journal Team'}</span>
                         <span>•</span>
                         <span>
                           {featuredArticle.publishedAt?.toLocaleDateString('en-US', {
@@ -352,7 +352,7 @@ export default async function HomePage() {
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-2xl font-bold mb-4">Independent Investigative Journalism</h2>
             <p className="text-muted-foreground mb-6">
-              NewsBali Online is an independent investigative journalism platform focused on
+              Bali Journal is an independent investigative journalism platform focused on
               delivering evidence-based news with high journalistic ethics standards. We are committed
               to providing accurate, balanced, and accountable information.
             </p>

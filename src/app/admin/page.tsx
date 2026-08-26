@@ -1052,7 +1052,7 @@ export default function MasterAdminDashboard() {
           <div className="flex items-center gap-2 px-2 py-1">
             <LayoutDashboard className="h-6 w-6 text-primary shrink-0" />
             <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-              <span className="font-bold text-sm leading-tight">NewsBali Master</span>
+              <span className="font-bold text-sm leading-tight">Bali Journal Master</span>
               <Badge variant="secondary" className="w-fit text-[10px] mt-0.5">v2.1.0</Badge>
             </div>
           </div>
@@ -1181,7 +1181,7 @@ export default function MasterAdminDashboard() {
                 <CardHeader>
                   <CardTitle>Welcome back, Admin</CardTitle>
                   <CardDescription>
-                    Here is what's happening on NewsBali today.
+                    Here is what's happening on Bali Journal today.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -2461,15 +2461,15 @@ export default function MasterAdminDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Site Name</Label>
-                      <Input defaultValue="NewsBali Online" />
+                      <Input defaultValue="Bali Journal" />
                     </div>
                     <div className="space-y-2">
                       <Label>Site URL</Label>
-                      <Input defaultValue="https://newsbali.online" />
+                      <Input defaultValue="https://www.balijournal.com" />
                     </div>
                     <div className="space-y-2">
                       <Label>Admin Email</Label>
-                      <Input defaultValue="admin@newsbali.online" />
+                      <Input defaultValue="admin@balijournal.com" />
                     </div>
                     <div className="space-y-2">
                       <Label>Default Language</Label>

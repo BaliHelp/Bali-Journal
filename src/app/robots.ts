@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
             allow: '/',
             disallow: ['/admin/', '/api/'],
         },
-        sitemap: 'https://newsbali.online/sitemap.xml',
+        sitemap: 'https://www.balijournal.com/sitemap.xml',
     }
 }

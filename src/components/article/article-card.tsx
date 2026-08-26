@@ -103,7 +103,7 @@ export function ArticleCard({ article, variant = 'default' }: ArticleCardProps) 
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
               <User className="h-3 w-3" />
-              <span>{article.author?.name || 'NewsBali Team'}</span>
+              <span>{article.author?.name || 'Bali Journal Team'}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">

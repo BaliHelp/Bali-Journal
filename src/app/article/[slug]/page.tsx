@@ -113,7 +113,7 @@ export async function generateMetadata({ params }: ArticlePageProps) {
       description: article.excerpt,
       type: 'article',
       publishedTime: article.publishedAt?.toISOString(),
-      authors: [article.author?.name || 'Tim NewsBali'],
+      authors: [article.author?.name || 'Tim Bali Journal'],
       images: article.featuredImageUrl ? [{ url: article.featuredImageUrl }] : [],
     },
     twitter: {
@@ -204,7 +204,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                <span>{article.author?.name || 'Tim NewsBali'}</span>
+                <span>{article.author?.name || 'Tim Bali Journal'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />

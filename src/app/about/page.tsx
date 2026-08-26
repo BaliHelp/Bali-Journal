@@ -41,7 +41,7 @@ export default function AboutPage() {
       <div className="container mx-auto max-w-4xl px-4">
         {/* Hero */}
         <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold mb-4">About NewsBali Online</h1>
+          <h1 className="text-3xl font-bold mb-4">About Bali Journal</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             An independent investigative journalism platform for Bali, 
             committed to evidence-based news and high ethical standards.
@@ -58,7 +58,7 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground leading-relaxed">
-              NewsBali Online exists to deliver high-quality investigative journalism 
+              Bali Journal exists to deliver high-quality investigative journalism 
               focused on important issues in Bali. We believe the public has the right 
               to receive accurate, balanced, and accountable information.
             </p>
@@ -122,7 +122,7 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              NewsBali Online uses AI technology to support the editorial process:
+              Bali Journal uses AI technology to support the editorial process:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="p-3 rounded-lg border text-center">

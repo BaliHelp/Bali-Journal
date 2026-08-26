@@ -1,8 +1,8 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-    title: 'Editorial Guidelines - NewsBali',
-    description: 'Editorial Guidelines and Ethics for NewsBali Online.'
+    title: 'Editorial Guidelines - Bali Journal',
+    description: 'Editorial Guidelines and Ethics for Bali Journal.'
 }
 
 export default function EditorialGuidelinesPage() {
@@ -15,7 +15,7 @@ export default function EditorialGuidelinesPage() {
                 <section>
                     <h2 className="text-xl font-semibold mb-2">1. Introduction</h2>
                     <p>
-                        NewsBali is dedicated to high-quality, independent journalism. These guidelines outline the principles that guide our reporting and editing.
+                        Bali Journal is dedicated to high-quality, independent journalism. These guidelines outline the principles that guide our reporting and editing.
                     </p>
                 </section>
 

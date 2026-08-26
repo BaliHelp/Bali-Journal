@@ -1,8 +1,8 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-    title: 'Terms & Conditions - NewsBali',
-    description: 'Terms and Conditions for using NewsBali Online.'
+    title: 'Terms & Conditions - Bali Journal',
+    description: 'Terms and Conditions for using Bali Journal.'
 }
 
 export default function TermsConditionsPage() {
@@ -15,14 +15,14 @@ export default function TermsConditionsPage() {
                 <section>
                     <h2 className="text-xl font-semibold mb-2">1. Acceptance of Terms</h2>
                     <p>
-                        By accessing and using NewsBali, you agree to comply with and be bound by these Terms & Conditions. If you do not agree, please do not use our site.
+                        By accessing and using Bali Journal, you agree to comply with and be bound by these Terms & Conditions. If you do not agree, please do not use our site.
                     </p>
                 </section>
 
                 <section>
                     <h2 className="text-xl font-semibold mb-2">2. Use of Content</h2>
                     <p>
-                        All content on NewsBali, including text, images, and videos, is for informational purposes only. You may not reproduce, distribute, or use our content for commercial purposes without our prior written consent.
+                        All content on Bali Journal, including text, images, and videos, is for informational purposes only. You may not reproduce, distribute, or use our content for commercial purposes without our prior written consent.
                     </p>
                 </section>
 
@@ -36,14 +36,14 @@ export default function TermsConditionsPage() {
                 <section>
                     <h2 className="text-xl font-semibold mb-2">4. Disclaimer of Warranties</h2>
                     <p>
-                        NewsBali is provided "as is" without any warranties, express or implied. We do not guarantee the accuracy or completeness of any information on our site.
+                        Bali Journal is provided "as is" without any warranties, express or implied. We do not guarantee the accuracy or completeness of any information on our site.
                     </p>
                 </section>
 
                 <section>
                     <h2 className="text-xl font-semibold mb-2">5. Limitation of Liability</h2>
                     <p>
-                        NewsBali shall not be liable for any damages arising out of or in connection with your use of our website.
+                        Bali Journal shall not be liable for any damages arising out of or in connection with your use of our website.
                     </p>
                 </section>
             </div>

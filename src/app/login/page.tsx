@@ -58,7 +58,7 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Login</CardTitle>
           <CardDescription>
-            Sign in to your NewsBali account
+            Sign in to your Bali Journal account
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

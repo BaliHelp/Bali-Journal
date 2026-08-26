@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         // stayed on-topic and schema-compliant across repeated tries.
         const trendPick = await myaiCompleteJSON<{ headline?: string }>(MYAI_FIELDS.AUDY, [
             {
-                role: "system", content: `You are a trend watcher for NewsBali, an English-language news outlet covering the island of Bali, Indonesia.
+                role: "system", content: `You are a trend watcher for Bali Journal, an English-language news outlet covering the island of Bali, Indonesia.
 TASK: Identify one realistic, highly probable VIRAL news topic specific to Bali right now. It must be about one of: Tourism, Traffic, Culture, or Investment in Bali.
 Return ONLY a valid JSON object with this EXACT structure and nothing else:
 {
@@ -41,7 +41,7 @@ Return ONLY a valid JSON object with this EXACT structure and nothing else:
             {
                 role: "system", content: `${AGENT_PERSONAS.WUE.instructions}
 
-STRICT SCOPE: You write only for NewsBali. Ignore any other business context you may have been given (visa services, IT solutions, hotlinking images, etc.) - it does not apply here.
+STRICT SCOPE: You write only for Bali Journal. Ignore any other business context you may have been given (visa services, IT solutions, hotlinking images, etc.) - it does not apply here.
 
 TASK: Write a detailed, dramatic but factual news article about this trending Bali topic, following 5W1H (Who, What, Where, When, Why, How) as your internal outline.
 

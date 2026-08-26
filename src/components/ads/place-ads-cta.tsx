@@ -10,7 +10,7 @@ export function PlaceAdsCTA() {
         <div className="flex items-center gap-3">
           <Megaphone className="h-8 w-8 text-primary shrink-0" />
           <div>
-            <p className="font-semibold">Ingin memasang iklan di NewsBali?</p>
+            <p className="font-semibold">Ingin memasang iklan di Bali Journal?</p>
             <p className="text-sm text-muted-foreground">Jangkau pembaca Bali - daftar sebagai pengiklan, mulai dari harga terjangkau.</p>
           </div>
         </div>
