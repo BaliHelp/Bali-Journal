@@ -69,7 +69,6 @@ export default async function HomePage() {
     opinionArticles,
     totalPublished,
     heroLeftAd,
-    heroMiniAd,
   ] = await Promise.all([
     getLatestArticles(),
     getFeaturedArticle(),
@@ -81,13 +80,12 @@ export default async function HomePage() {
     getArticlesByCategory('OPINION'),
     getPublishedCount(),
     getActiveAd('HOME_HERO_LEFT', 'DESKTOP'),
-    getActiveAd('HOME_HERO_MINI', 'DESKTOP'),
   ])
 
   // The ad rail column only reserves its grid space when there's actually
   // something to show - otherwise the hero falls back to today's layout
   // instead of leaving an empty box.
-  const showHeroAdRail = !!heroLeftAd || !!heroMiniAd
+  const showHeroAdRail = !!heroLeftAd
 
   return (
     <div className="min-h-screen">
@@ -95,13 +93,16 @@ export default async function HomePage() {
       <section className="bg-gradient-to-b from-muted/50 to-background">
         <div className="container mx-auto max-w-7xl px-4 py-8">
           <div className="flex flex-col lg:flex-row gap-6">
-            {/* Ad rail - only takes up space when there's actually an ad to show */}
-            {showHeroAdRail && (
-              <div className="hidden lg:flex lg:flex-col gap-6 w-[160px] shrink-0">
-                <AdSlot position="HOME_HERO_LEFT" device="DESKTOP" className="w-full flex-1 rounded-lg overflow-hidden" fill />
-                <AdSlot position="HOME_HERO_MINI" device="DESKTOP" className="w-full h-40 rounded-lg overflow-hidden shrink-0" fill />
-              </div>
-            )}
+            {/* Ad rail + Featured Article are grouped in their own flex-row so
+                the rail's stretched height matches ONLY this column (hero +
+                below-hero banner), not the taller Breaking News sidebar. */}
+            <div className="flex-1 min-w-0 flex flex-col lg:flex-row gap-6">
+              {/* Ad rail - only takes up space when there's actually an ad to show */}
+              {showHeroAdRail && (
+                <div className="hidden lg:block w-[160px] shrink-0">
+                  <AdSlot position="HOME_HERO_LEFT" device="DESKTOP" className="w-full h-full rounded-lg overflow-hidden" fill />
+                </div>
+              )}
 
             {/* Featured Article */}
             <div className="flex-1 min-w-0 flex flex-col gap-6">
@@ -154,6 +155,7 @@ export default async function HomePage() {
                 </div>
               )}
               <AdSlot position="HOME_HERO_BELOW" device="DESKTOP" className="w-full h-40 rounded-lg overflow-hidden shrink-0" fill />
+            </div>
             </div>
 
             {/* Sidebar - Latest News (Scrollable) */}
