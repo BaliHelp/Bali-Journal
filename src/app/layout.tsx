@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { BreakingNews } from '@/components/layout/breaking-news'
+import { ThemeProvider } from '@/components/theme-provider'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -70,15 +71,17 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased bg-background text-foreground font-sans`} suppressHydrationWarning>
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <BreakingNews />
-          <main className="flex-1">
-            {children}
-          </main>
-          <Footer />
-        </div>
-        <Toaster />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <div className="min-h-screen flex flex-col">
+            <Header />
+            <BreakingNews />
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer />
+          </div>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )

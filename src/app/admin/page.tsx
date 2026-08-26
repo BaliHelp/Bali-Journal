@@ -9,11 +9,14 @@ import {
   SidebarHeader,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  SidebarSeparator,
 } from '@/components/ui/sidebar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -75,15 +78,41 @@ import { AgentStatusCard } from '@/components/admin/agent-status-card'
 import { SystemHealthCard } from '@/components/admin/system-health-card'
 import { ScheduleCard } from '@/components/admin/schedule-card'
 
-const NAV_ITEMS = [
-  { value: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { value: 'articles', label: 'Articles', icon: FileText },
-  { value: 'comments', label: 'Comments', icon: MessageCircle },
-  { value: 'users', label: 'Users', icon: Users },
-  { value: 'reports', label: 'Reports', icon: BarChart3 },
-  { value: 'ai', label: 'AI Center', icon: Brain },
-  { value: 'settings', label: 'Settings', icon: Settings },
-] as const
+interface NavItem {
+  value: string
+  label: string
+  icon: typeof LayoutDashboard
+}
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Utama',
+    items: [{ value: 'overview', label: 'Overview', icon: LayoutDashboard }],
+  },
+  {
+    label: 'Konten',
+    items: [
+      { value: 'articles', label: 'Articles', icon: FileText },
+      { value: 'comments', label: 'Comments', icon: MessageCircle },
+    ],
+  },
+  {
+    label: 'Manajemen',
+    items: [
+      { value: 'users', label: 'Users', icon: Users },
+      { value: 'reports', label: 'Reports', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Sistem',
+    items: [
+      { value: 'ai', label: 'AI Center', icon: Brain },
+      { value: 'settings', label: 'Settings', icon: Settings },
+    ],
+  },
+]
+
+const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items)
 
 const categories = [
   { value: 'TOURISM', label: 'Pariwisata' },
@@ -529,20 +558,26 @@ export default function MasterAdminDashboard() {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <SidebarMenu>
-            {NAV_ITEMS.map((item) => (
-              <SidebarMenuItem key={item.value}>
-                <SidebarMenuButton
-                  isActive={activeTab === item.value}
-                  onClick={() => setActiveTab(item.value)}
-                  tooltip={item.label}
-                >
-                  <item.icon />
-                  <span>{item.label}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
+          {NAV_GROUPS.map((group, gi) => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.value}>
+                    <SidebarMenuButton
+                      isActive={activeTab === item.value}
+                      onClick={() => setActiveTab(item.value)}
+                      tooltip={item.label}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+              {gi < NAV_GROUPS.length - 1 && <SidebarSeparator className="mx-0" />}
+            </SidebarGroup>
+          ))}
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>

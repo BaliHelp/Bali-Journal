@@ -2,9 +2,18 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Menu, Search, User, X, Globe } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Menu, Search, User, X, Globe, Sun, Moon, Monitor, Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
 const categories = {
@@ -61,6 +70,7 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [lang, setLang] = useState<'en' | 'id'>('en')
   const [hydrated, setHydrated] = useState(false)
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     setLang(getSavedLang())
@@ -128,16 +138,38 @@ export function Header() {
             </div>
           ) : (
             <>
-              {/* Language Toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleLang}
-                className="gap-1"
-              >
-                <Globe className="h-4 w-4" />
-                <span className="text-xs font-semibold">{lang === 'en' ? 'EN' : 'ID'}</span>
-              </Button>
+              {/* Language & Theme */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    <Globe className="h-4 w-4" />
+                    <span className="text-xs font-semibold">{lang === 'en' ? 'EN' : 'ID'}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>Bahasa / Language</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => lang !== 'en' && toggleLang()}>
+                    English {lang === 'en' && <Check className="ml-auto h-4 w-4" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => lang !== 'id' && toggleLang()}>
+                    Bahasa Indonesia {lang === 'id' && <Check className="ml-auto h-4 w-4" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Tema / Theme</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => setTheme('light')}>
+                    <Sun className="mr-2 h-4 w-4" /> Terang
+                    {theme === 'light' && <Check className="ml-auto h-4 w-4" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTheme('dark')}>
+                    <Moon className="mr-2 h-4 w-4" /> Gelap
+                    {theme === 'dark' && <Check className="ml-auto h-4 w-4" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTheme('system')}>
+                    <Monitor className="mr-2 h-4 w-4" /> Sistem
+                    {theme === 'system' && <Check className="ml-auto h-4 w-4" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <Button
                 variant="ghost"
