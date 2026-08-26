@@ -14,7 +14,9 @@ export type AdPositionValue =
   | 'ARTICLE_RIGHT_TOP'
   | 'ARTICLE_RIGHT_BOTTOM'
 
-type AdDeviceValue = 'DESKTOP' | 'MOBILE' | 'BOTH'
+export type AdDeviceValue = 'DESKTOP' | 'MOBILE' | 'BOTH'
+
+export type AdWithSlot = Ad & { slot: AdSlotModel }
 
 interface AdSlotProps {
   position: AdPositionValue
@@ -23,7 +25,7 @@ interface AdSlotProps {
   className?: string
 }
 
-const DEVICE_CLASS: Record<AdDeviceValue, string> = {
+export const DEVICE_CLASS: Record<AdDeviceValue, string> = {
   DESKTOP: 'hidden md:flex',
   MOBILE: 'flex md:hidden',
   BOTH: 'flex',
@@ -37,12 +39,15 @@ const DEVICE_CLASS: Record<AdDeviceValue, string> = {
  * a blank box (mirrors the DEVICE_CLASS split: DESKTOP/MOBILE must be
  * queried separately since a slot can have ads for one but not the other).
  */
-export async function getActiveAd(
-  position: AdPositionValue,
-  device: AdDeviceValue = 'BOTH'
-): Promise<(Ad & { slot: AdSlotModel }) | null> {
+export async function getActiveAd(position: AdPositionValue, device: AdDeviceValue = 'BOTH'): Promise<AdWithSlot | null> {
+  const ads = await getActiveAds(position, device, 1)
+  return ads[0] ?? null
+}
+
+/** Same query as getActiveAd but returns up to `limit` ads - used by RotatingAdSlot to decide whether a position needs a carousel. */
+export async function getActiveAds(position: AdPositionValue, device: AdDeviceValue = 'BOTH', limit = 5): Promise<AdWithSlot[]> {
   const now = new Date()
-  const ads = await db.ad.findMany({
+  return db.ad.findMany({
     where: {
       isActive: true,
       startDate: { lte: now },
@@ -51,22 +56,12 @@ export async function getActiveAd(
     },
     include: { slot: true },
     orderBy: { createdAt: 'desc' },
-    take: 1,
+    take: limit,
   })
-  return ads[0] ?? null
 }
 
-/**
- * Server component - queries active ads directly (no extra round-trip via
- * the public /api/ads/active endpoint, that one exists for client-side
- * fetches if a page ever needs to refresh ads without a full reload).
- * Renders nothing if there's no active ad for this slot/device, so it never
- * leaves an empty gap.
- */
-export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSlotProps) {
-  const ad = await getActiveAd(position, device)
-  if (!ad) return null
-
+/** Renders one ad's creative (image/video) wrapped in its click-through link, if any. Shared by AdSlot (single) and AdCarousel (rotating). */
+export function AdMedia({ ad }: { ad: AdWithSlot }) {
   const media =
     ad.mediaType === 'VIDEO' ? (
       <video
@@ -91,7 +86,7 @@ export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSl
     )
 
   return (
-    <div className={`${DEVICE_CLASS[device]} ${className} justify-center items-center overflow-hidden`}>
+    <>
       <span className="sr-only">Iklan: {ad.advertiserName}</span>
       {ad.linkUrl ? (
         <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer sponsored">
@@ -100,6 +95,24 @@ export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSl
       ) : (
         media
       )}
+    </>
+  )
+}
+
+/**
+ * Server component - queries active ads directly (no extra round-trip via
+ * the public /api/ads/active endpoint, that one exists for client-side
+ * fetches if a page ever needs to refresh ads without a full reload).
+ * Renders nothing if there's no active ad for this slot/device, so it never
+ * leaves an empty gap.
+ */
+export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSlotProps) {
+  const ad = await getActiveAd(position, device)
+  if (!ad) return null
+
+  return (
+    <div className={`${DEVICE_CLASS[device]} ${className} justify-center items-center overflow-hidden`}>
+      <AdMedia ad={ad} />
     </div>
   )
 }

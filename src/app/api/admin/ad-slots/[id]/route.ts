@@ -33,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
                         : body.pricePerDay !== undefined
                           ? Number(body.pricePerDay)
                           : undefined,
+                defaultDurationDays: body.defaultDurationDays !== undefined ? Number(body.defaultDurationDays) : undefined,
             },
         })
         return NextResponse.json({ slot })

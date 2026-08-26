@@ -304,15 +304,16 @@ enum AdMediaType {
 }
 
 model AdSlot {
-  id          String     @id @default(uuid())
-  name        String
-  position    AdPosition
-  device      AdDevice
-  width       Int
-  height      Int
-  pricePerDay Int?
-  ads         Ad[]
-  createdAt   DateTime   @default(now())
+  id                  String     @id @default(uuid())
+  name                String
+  position            AdPosition
+  device              AdDevice
+  width               Int
+  height              Int
+  pricePerDay         Int?
+  defaultDurationDays Int        @default(7)
+  ads                 Ad[]
+  createdAt           DateTime   @default(now())
 
   @@map("ad_slots")
 }

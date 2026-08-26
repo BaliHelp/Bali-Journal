@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json()
-        const { name, position, device, width, height, pricePerDay } = body
+        const { name, position, device, width, height, pricePerDay, defaultDurationDays } = body
 
         if (!name || !position || !device || !width || !height) {
             return NextResponse.json({ error: 'name, position, device, width, height are required' }, { status: 400 })
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
                 width: Number(width),
                 height: Number(height),
                 pricePerDay: pricePerDay !== undefined && pricePerDay !== null && pricePerDay !== '' ? Number(pricePerDay) : null,
+                defaultDurationDays: defaultDurationDays ? Number(defaultDurationDays) : undefined,
             },
         })
         return NextResponse.json({ slot })

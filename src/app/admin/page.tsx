@@ -74,7 +74,8 @@ import {
   Megaphone,
   Upload,
   Users2,
-  Receipt
+  Receipt,
+  DollarSign
 } from 'lucide-react'
 import Image from 'next/image'
 import { AiControls } from '@/components/admin/ai-controls'
@@ -113,6 +114,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'Monetisasi',
     items: [
       { value: 'ads', label: 'Ads', icon: Megaphone },
+      { value: 'pricing', label: 'Pricing', icon: DollarSign },
       { value: 'advertisers', label: 'Advertisers', icon: Users2 },
       { value: 'invoices', label: 'Invoices', icon: Receipt },
     ],
@@ -185,6 +187,7 @@ interface AdSlotRow {
   width: number
   height: number
   pricePerDay: number | null
+  defaultDurationDays: number
   ads: { id: string; isActive: boolean }[]
 }
 
@@ -341,7 +344,9 @@ export default function MasterAdminDashboard() {
   const [ads, setAds] = useState<AdRow[]>([])
   const [showAdSlotDialog, setShowAdSlotDialog] = useState(false)
   const [showAdDialog, setShowAdDialog] = useState(false)
-  const [adSlotForm, setAdSlotForm] = useState({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90, pricePerDay: '' })
+  const [adSlotForm, setAdSlotForm] = useState({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90, pricePerDay: '', defaultDurationDays: '7' })
+  const [pricingEdits, setPricingEdits] = useState<Record<string, { pricePerDay: string; defaultDurationDays: string }>>({})
+  const [savingPricingId, setSavingPricingId] = useState<string | null>(null)
   const [adForm, setAdForm] = useState({ slotId: '', advertiserId: '', advertiserName: '', linkUrl: '', startDate: '', endDate: '', invoiceAmount: '' })
   const [adFile, setAdFile] = useState<File | null>(null)
   const [adsLoading, setAdsLoading] = useState(false)
@@ -369,7 +374,7 @@ export default function MasterAdminDashboard() {
   }
 
   useEffect(() => {
-    if (activeTab === 'ads' && adSlots.length === 0 && ads.length === 0) {
+    if ((activeTab === 'ads' || activeTab === 'pricing') && adSlots.length === 0 && ads.length === 0) {
       fetchAdsData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -388,7 +393,7 @@ export default function MasterAdminDashboard() {
       if (!res.ok) throw new Error(data.error || 'Failed to create ad slot')
       setSuccess('Ad slot created!')
       setShowAdSlotDialog(false)
-      setAdSlotForm({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90, pricePerDay: '' })
+      setAdSlotForm({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90, pricePerDay: '', defaultDurationDays: '7' })
       fetchAdsData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create ad slot')
@@ -404,6 +409,32 @@ export default function MasterAdminDashboard() {
       fetchAdsData()
     } catch {
       setError('Failed to delete ad slot')
+    }
+  }
+
+  async function handleSavePricing(slot: AdSlotRow) {
+    const edit = pricingEdits[slot.id]
+    const pricePerDay = edit?.pricePerDay ?? (slot.pricePerDay?.toString() || '')
+    const defaultDurationDays = edit?.defaultDurationDays ?? slot.defaultDurationDays.toString()
+
+    setSavingPricingId(slot.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/ad-slots/${slot.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pricePerDay: pricePerDay === '' ? null : Number(pricePerDay),
+          defaultDurationDays: Number(defaultDurationDays),
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to save pricing')
+      setSuccess('Pricing updated!')
+      fetchAdsData()
+    } catch {
+      setError('Failed to save pricing')
+    } finally {
+      setSavingPricingId(null)
     }
   }
 
@@ -463,6 +494,50 @@ export default function MasterAdminDashboard() {
       fetchAdsData()
     } catch {
       setError('Failed to delete ad')
+    }
+  }
+
+  // Edit Ad dialog state
+  const [showEditAdDialog, setShowEditAdDialog] = useState(false)
+  const [editingAdId, setEditingAdId] = useState<string | null>(null)
+  const [editAdForm, setEditAdForm] = useState({ advertiserName: '', linkUrl: '', startDate: '', endDate: '', isActive: true })
+  const [editAdFile, setEditAdFile] = useState<File | null>(null)
+
+  function openEditAd(ad: AdRow) {
+    setEditingAdId(ad.id)
+    setEditAdForm({
+      advertiserName: ad.advertiserName,
+      linkUrl: ad.linkUrl || '',
+      startDate: ad.startDate.slice(0, 10),
+      endDate: ad.endDate.slice(0, 10),
+      isActive: ad.isActive,
+    })
+    setEditAdFile(null)
+    setShowEditAdDialog(true)
+  }
+
+  async function handleUpdateAd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingAdId) return
+    setError(null)
+    try {
+      const formData = new FormData()
+      formData.append('advertiserName', editAdForm.advertiserName)
+      formData.append('linkUrl', editAdForm.linkUrl)
+      formData.append('startDate', editAdForm.startDate)
+      formData.append('endDate', editAdForm.endDate)
+      formData.append('isActive', String(editAdForm.isActive))
+      if (editAdFile) formData.append('file', editAdFile)
+
+      const res = await fetch(`/api/admin/ads/${editingAdId}`, { method: 'PATCH', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update ad')
+      setSuccess('Ad updated!')
+      setShowEditAdDialog(false)
+      setEditingAdId(null)
+      fetchAdsData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update ad')
     }
   }
 
@@ -537,13 +612,6 @@ export default function MasterAdminDashboard() {
       setInvoicesLoading(false)
     }
   }
-
-  useEffect(() => {
-    if (activeTab === 'invoices' && invoices.length === 0) {
-      fetchInvoices()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
 
   async function handleVerifyInvoicePaid(id: string) {
     if (!confirm('Konfirmasi: tandai invoice ini LUNAS? Iklan akan langsung aktif tayang.')) return
@@ -661,6 +729,17 @@ export default function MasterAdminDashboard() {
       fetchAllData()
     }
   }, [authChecked])
+
+  // Fetched on auth (not gated to the tab) so the pending-count badge on the
+  // "Invoices" sidebar item is visible before admin ever opens that tab.
+  useEffect(() => {
+    if (authChecked) {
+      fetchInvoices()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked])
+
+  const pendingInvoiceCount = invoices.filter((inv) => inv.status === 'VERIFYING').length
 
   async function fetchAllData() {
     setLoading(true)
@@ -992,6 +1071,9 @@ export default function MasterAdminDashboard() {
                     >
                       <item.icon />
                       <span>{item.label}</span>
+                      {item.value === 'invoices' && pendingInvoiceCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto text-xs">{pendingInvoiceCount}</Badge>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -1702,7 +1784,7 @@ export default function MasterAdminDashboard() {
                                 <SelectContent>
                                   {AD_POSITIONS.map((p) => (
                                     <SelectItem key={p.value} value={p.value}>
-                                      {p.label} ({p.width}x{p.height})
+                                      {p.label} ({p.width}x{p.height} px)
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -1749,6 +1831,16 @@ export default function MasterAdminDashboard() {
                               onChange={(e) => setAdSlotForm({ ...adSlotForm, pricePerDay: e.target.value })}
                             />
                           </div>
+                          <div className="space-y-2">
+                            <Label>Durasi Default (hari)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={adSlotForm.defaultDurationDays}
+                              onChange={(e) => setAdSlotForm({ ...adSlotForm, defaultDurationDays: e.target.value })}
+                            />
+                            <p className="text-xs text-muted-foreground">Dipakai untuk pre-fill tanggal saat advertiser memilih slot ini.</p>
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             Standar IAB: Leaderboard 728x90, Medium Rectangle 300x250, Mobile Banner 320x50.
                           </p>
@@ -1781,7 +1873,7 @@ export default function MasterAdminDashboard() {
                             <Badge variant="secondary">{AD_POSITIONS.find((p) => p.value === s.position)?.label ?? s.position}</Badge>
                           </TableCell>
                           <TableCell>{s.device}</TableCell>
-                          <TableCell>{s.width}x{s.height}</TableCell>
+                          <TableCell>{s.width}x{s.height} px</TableCell>
                           <TableCell>
                             {s.pricePerDay != null
                               ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(s.pricePerDay)
@@ -1831,7 +1923,7 @@ export default function MasterAdminDashboard() {
                               <SelectTrigger><SelectValue placeholder="Pilih slot" /></SelectTrigger>
                               <SelectContent>
                                 {adSlots.map((s) => (
-                                  <SelectItem key={s.id} value={s.id}>{s.name} ({s.width}x{s.height})</SelectItem>
+                                  <SelectItem key={s.id} value={s.id}>{s.name} ({s.width}x{s.height} px)</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -1984,6 +2076,9 @@ export default function MasterAdminDashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => openEditAd(ad)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleDeleteAd(ad.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -2001,7 +2096,149 @@ export default function MasterAdminDashboard() {
                   </Table>
                 </CardContent>
               </Card>
+
+              <Dialog open={showEditAdDialog} onOpenChange={setShowEditAdDialog}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Ad</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleUpdateAd} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Nama Advertiser</Label>
+                      <Input
+                        value={editAdForm.advertiserName}
+                        onChange={(e) => setEditAdForm({ ...editAdForm, advertiserName: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Link Tujuan (opsional)</Label>
+                      <Input
+                        type="url"
+                        value={editAdForm.linkUrl}
+                        onChange={(e) => setEditAdForm({ ...editAdForm, linkUrl: e.target.value })}
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Mulai</Label>
+                        <Input
+                          type="date"
+                          value={editAdForm.startDate}
+                          onChange={(e) => setEditAdForm({ ...editAdForm, startDate: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Selesai</Label>
+                        <Input
+                          type="date"
+                          value={editAdForm.endDate}
+                          onChange={(e) => setEditAdForm({ ...editAdForm, endDate: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Ganti Creative (opsional)</Label>
+                      <Input
+                        type="file"
+                        accept="image/*,video/webm,video/mp4"
+                        onChange={(e) => setEditAdFile(e.target.files?.[0] || null)}
+                      />
+                      <p className="text-xs text-muted-foreground">Kosongkan untuk pertahankan creative saat ini.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="edit-ad-active"
+                        checked={editAdForm.isActive}
+                        onChange={(e) => setEditAdForm({ ...editAdForm, isActive: e.target.checked })}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="edit-ad-active" className="cursor-pointer">Aktif (tayang di situs)</Label>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit">Simpan Perubahan</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
+          </TabsContent>
+
+          <TabsContent value="pricing">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pricing</CardTitle>
+                <CardDescription>Harga per hari & durasi default tiap box iklan - langsung dipakai advertiser saat pesan iklan</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nama Slot</TableHead>
+                      <TableHead>Posisi</TableHead>
+                      <TableHead>Ukuran</TableHead>
+                      <TableHead>Harga per Hari (Rp)</TableHead>
+                      <TableHead>Durasi Default (hari)</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {adSlots.map((s) => {
+                      const edit = pricingEdits[s.id]
+                      const priceValue = edit?.pricePerDay ?? (s.pricePerDay?.toString() || '')
+                      const durationValue = edit?.defaultDurationDays ?? s.defaultDurationDays.toString()
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium">{s.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{AD_POSITIONS.find((p) => p.value === s.position)?.label ?? s.position}</Badge>
+                          </TableCell>
+                          <TableCell>{s.width}x{s.height} px</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              className="w-32"
+                              placeholder="Admin only"
+                              value={priceValue}
+                              onChange={(e) =>
+                                setPricingEdits({ ...pricingEdits, [s.id]: { pricePerDay: e.target.value, defaultDurationDays: durationValue } })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={1}
+                              className="w-24"
+                              value={durationValue}
+                              onChange={(e) =>
+                                setPricingEdits({ ...pricingEdits, [s.id]: { pricePerDay: priceValue, defaultDurationDays: e.target.value } })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" disabled={savingPricingId === s.id} onClick={() => handleSavePricing(s)}>
+                              {savingPricingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                    {adSlots.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          {adsLoading ? 'Loading...' : 'Belum ada slot iklan. Buat dulu di tab Ads.'}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="advertisers">

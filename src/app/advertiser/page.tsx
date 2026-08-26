@@ -26,6 +26,7 @@ interface SlotOption {
   width: number
   height: number
   pricePerDay: number
+  defaultDurationDays: number
 }
 
 interface InvoiceRow {
@@ -67,6 +68,26 @@ function adStatusLabel(ad: AdRow): { label: string; variant: 'default' | 'second
   if (new Date(ad.endDate) < now) return { label: 'Kadaluarsa', variant: 'outline' }
   if (new Date(ad.startDate) > now) return { label: 'Terjadwal', variant: 'outline' }
   return { label: 'Aktif', variant: 'default' }
+}
+
+function durationInfo(ad: AdRow): { totalDays: number; remainingText: string } {
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const start = new Date(ad.startDate)
+  const end = new Date(ad.endDate)
+  const now = new Date()
+  const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / DAY_MS))
+
+  if (!ad.isActive) return { totalDays, remainingText: '-' }
+  if (start > now) {
+    const daysUntilStart = Math.ceil((start.getTime() - now.getTime()) / DAY_MS)
+    return { totalDays, remainingText: `Mulai dalam ${daysUntilStart} hari` }
+  }
+  if (end < now) {
+    const daysAgo = Math.ceil((now.getTime() - end.getTime()) / DAY_MS)
+    return { totalDays, remainingText: `Berakhir ${daysAgo} hari lalu` }
+  }
+  const daysLeft = Math.ceil((end.getTime() - now.getTime()) / DAY_MS)
+  return { totalDays, remainingText: `${daysLeft} hari lagi` }
 }
 
 export default function AdvertiserDashboardPage() {
@@ -254,12 +275,30 @@ export default function AdvertiserDashboardPage() {
             <form onSubmit={handleCreateAd} className="space-y-4">
               <div className="space-y-2">
                 <Label>Slot Iklan</Label>
-                <Select value={form.slotId} onValueChange={(v) => setForm({ ...form, slotId: v })}>
+                <Select
+                  value={form.slotId}
+                  onValueChange={(v) => {
+                    const slot = slots.find((s) => s.id === v)
+                    const shouldPrefillDates = !form.startDate && !form.endDate && slot
+                    if (shouldPrefillDates) {
+                      const start = new Date()
+                      const end = new Date(start.getTime() + slot.defaultDurationDays * 24 * 60 * 60 * 1000)
+                      setForm({
+                        ...form,
+                        slotId: v,
+                        startDate: start.toISOString().slice(0, 10),
+                        endDate: end.toISOString().slice(0, 10),
+                      })
+                    } else {
+                      setForm({ ...form, slotId: v })
+                    }
+                  }}
+                >
                   <SelectTrigger><SelectValue placeholder="Pilih slot" /></SelectTrigger>
                   <SelectContent>
                     {slots.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name} ({s.width}x{s.height}) - {formatRupiah(s.pricePerDay)}/hari
+                        {s.name} ({s.width}x{s.height} px) - {formatRupiah(s.pricePerDay)}/hari
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -307,25 +346,30 @@ export default function AdvertiserDashboardPage() {
               <TableRow>
                 <TableHead>Slot</TableHead>
                 <TableHead>Periode</TableHead>
+                <TableHead>Durasi</TableHead>
+                <TableHead>Sisa Waktu</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {ads.map((ad) => {
                 const status = adStatusLabel(ad)
+                const duration = durationInfo(ad)
                 return (
                   <TableRow key={ad.id}>
                     <TableCell className="font-medium">{ad.slot?.name}</TableCell>
                     <TableCell className="text-xs">
                       {new Date(ad.startDate).toLocaleDateString('id-ID')} - {new Date(ad.endDate).toLocaleDateString('id-ID')}
                     </TableCell>
+                    <TableCell className="text-xs">{duration.totalDays} hari</TableCell>
+                    <TableCell className="text-xs">{duration.remainingText}</TableCell>
                     <TableCell><Badge variant={status.variant}>{status.label}</Badge></TableCell>
                   </TableRow>
                 )
               })}
               {ads.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">Belum ada iklan.</TableCell>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Belum ada iklan.</TableCell>
                 </TableRow>
               )}
             </TableBody>

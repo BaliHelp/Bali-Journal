@@ -7,6 +7,8 @@ import { Footer } from '@/components/layout/footer'
 import { BreakingNews } from '@/components/layout/breaking-news'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AdSlot } from '@/components/ads/ad-slot'
+import { RotatingAdSlot } from '@/components/ads/rotating-ad-slot'
+import { PlaceAdsCTA } from '@/components/ads/place-ads-cta'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -75,13 +77,14 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <div className="min-h-screen flex flex-col">
             <Header />
-            <AdSlot position="HEADER" device="DESKTOP" className="py-2" />
+            <RotatingAdSlot position="HEADER" device="DESKTOP" className="py-2" />
             <AdSlot position="MOBILE_BANNER" device="MOBILE" className="py-2" />
             <BreakingNews />
             <main className="flex-1">
               {children}
             </main>
             <AdSlot position="FOOTER" className="py-4" />
+            <PlaceAdsCTA />
             <Footer />
           </div>
           <Toaster />
