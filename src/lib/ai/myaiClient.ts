@@ -81,14 +81,24 @@ function normalizeResult(result: unknown): string {
     return String(result)
 }
 
-export async function myaiComplete(field: MyaiField, messages: MyaiMessage[]): Promise<string> {
+// Pins a specific underlying model instead of letting the field's own tier
+// routing pick one. Confirmed via direct testing (2026-08-26): `field` alone
+// can get hijacked into a completely different schema/language on certain
+// prompts (content_journalist returning Indonesian keys like "judul"/
+// "artikel" instead of the requested English schema - most likely
+// cross-contamination from another app sharing that field on the gateway).
+// Sending `field` + `model` together makes the gateway honor the requested
+// model directly (confirmed via `provider_used` in the response) and the
+// hijacking stopped. `field` is still required by the gateway even when
+// pinning a model, so this always sends both.
+export async function myaiComplete(field: MyaiField, messages: MyaiMessage[], model?: string): Promise<string> {
     const res = await fetch(`${MYAI_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${process.env.MYAI_API_KEY}`,
         },
-        body: JSON.stringify({ field, messages }),
+        body: JSON.stringify(model ? { field, model, messages } : { field, messages }),
     })
 
     if (!res.ok) {
@@ -134,8 +144,8 @@ function extractJson(raw: string): string {
     return text.slice(start).trim()
 }
 
-export async function myaiCompleteJSON<T = any>(field: MyaiField, messages: MyaiMessage[]): Promise<T> {
-    const raw = await myaiComplete(field, messages)
+export async function myaiCompleteJSON<T = any>(field: MyaiField, messages: MyaiMessage[], model?: string): Promise<T> {
+    const raw = await myaiComplete(field, messages, model)
     return JSON.parse(extractJson(raw))
 }
 

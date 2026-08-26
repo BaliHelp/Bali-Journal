@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. AI Rewrites it (Process)
-        const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>(MYAI_FIELDS.WIE, [
+        const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>('chatbot', [
             {
                 role: "system", content: `${AGENT_PERSONAS.WIE.instructions}
 
@@ -83,7 +83,11 @@ else - no commentary before or after:
             // content_journalist return an empty {}. Plain "write about"
             // framing works reliably.
             { role: "user", content: `Write a news article about the story described in this source material (from ${url}):\n\n${content}` }
-        ])
+        // Pin gpt-4o-mini directly instead of letting content_journalist's
+        // tier routing pick a model - confirmed via testing that field can
+        // get hijacked into a different schema/language on this kind of
+        // "process this source content" prompt (see myaiClient.ts).
+        ], 'gpt-4o-mini')
 
         if (!articleData.title) {
             throw new Error('AI response did not include a title - the model deviated from the requested JSON schema. Try again.')

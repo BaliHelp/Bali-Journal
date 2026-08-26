@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         // cross-contamination from another app sharing that field on the
         // gateway. 'chatbot' (GPT-4o-mini) follows the requested schema
         // reliably instead.
-        const result = await myaiCompleteJSON(MYAI_FIELDS.WIE, [
+        const result = await myaiCompleteJSON('chatbot', [
             {
                 role: "system",
                 content: `You are a senior editor at NewsBali. You are given raw data, notes, or a press release.
@@ -60,7 +60,11 @@ export async function POST(request: Request) {
                 role: "user",
                 content: `Write a news article based on the following information:\n${content}`
             }
-        ])
+        // Pin gpt-4o-mini directly instead of letting content_journalist's
+        // tier routing pick a model - confirmed via testing that field can
+        // get hijacked into a schema/language other than requested for this
+        // kind of "process this source content" prompt (see myaiClient.ts).
+        ], 'gpt-4o-mini')
 
         if (!result.title || !result.slug) {
             throw new Error('AI response did not include a title/slug - the model deviated from the requested JSON schema. Try again.')
