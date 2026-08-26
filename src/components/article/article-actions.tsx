@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Share2, Bookmark, BookmarkCheck } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useLang } from '@/lib/use-lang'
 
 interface ArticleActionsProps {
   slug: string
@@ -12,6 +13,31 @@ interface ArticleActionsProps {
 }
 
 const BOOKMARKS_KEY = 'newsbali_bookmarks'
+
+const translations = {
+  en: {
+    share: 'Share',
+    save: 'Save',
+    saved: 'Saved',
+    linkCopiedTitle: 'Link copied',
+    linkCopiedDesc: 'Article link copied to clipboard.',
+    copyFailedTitle: 'Failed to copy link',
+    removedTitle: 'Removed from saved',
+    savedTitle: 'Article saved',
+    savedDesc: 'You can find it again in your browser history.',
+  },
+  id: {
+    share: 'Bagikan',
+    save: 'Simpan',
+    saved: 'Tersimpan',
+    linkCopiedTitle: 'Tautan disalin',
+    linkCopiedDesc: 'Link artikel sudah disalin ke clipboard.',
+    copyFailedTitle: 'Gagal menyalin tautan',
+    removedTitle: 'Dihapus dari simpanan',
+    savedTitle: 'Artikel disimpan',
+    savedDesc: 'Bisa dilihat lagi lewat riwayat browser Anda.',
+  },
+}
 
 function readBookmarks(): string[] {
   try {
@@ -33,6 +59,8 @@ function writeBookmarks(slugs: string[]) {
 export function ArticleActions({ slug, title, excerpt }: ArticleActionsProps) {
   const { toast } = useToast()
   const [isSaved, setIsSaved] = useState(false)
+  const lang = useLang()
+  const t = translations[lang]
 
   useEffect(() => {
     setIsSaved(readBookmarks().includes(slug))
@@ -52,9 +80,9 @@ export function ArticleActions({ slug, title, excerpt }: ArticleActionsProps) {
 
     try {
       await navigator.clipboard.writeText(url)
-      toast({ title: 'Tautan disalin', description: 'Link artikel sudah disalin ke clipboard.' })
+      toast({ title: t.linkCopiedTitle, description: t.linkCopiedDesc })
     } catch {
-      toast({ title: 'Gagal menyalin tautan', variant: 'destructive' })
+      toast({ title: t.copyFailedTitle, variant: 'destructive' })
     }
   }
 
@@ -64,8 +92,8 @@ export function ArticleActions({ slug, title, excerpt }: ArticleActionsProps) {
     writeBookmarks(next)
     setIsSaved(!isSaved)
     toast({
-      title: isSaved ? 'Dihapus dari simpanan' : 'Artikel disimpan',
-      description: isSaved ? undefined : 'Bisa dilihat lagi lewat riwayat browser Anda.',
+      title: isSaved ? t.removedTitle : t.savedTitle,
+      description: isSaved ? undefined : t.savedDesc,
     })
   }
 
@@ -73,11 +101,11 @@ export function ArticleActions({ slug, title, excerpt }: ArticleActionsProps) {
     <div className="flex flex-wrap gap-2 mb-8">
       <Button variant="outline" size="sm" onClick={handleShare}>
         <Share2 className="h-4 w-4 mr-2" />
-        Bagikan
+        {t.share}
       </Button>
       <Button variant="outline" size="sm" onClick={handleSave}>
         {isSaved ? <BookmarkCheck className="h-4 w-4 mr-2" /> : <Bookmark className="h-4 w-4 mr-2" />}
-        {isSaved ? 'Tersimpan' : 'Simpan'}
+        {isSaved ? t.saved : t.save}
       </Button>
     </div>
   )

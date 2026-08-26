@@ -12,9 +12,9 @@ interface BreakingNewsItem {
 
 // Fallback breaking news if no database data
 const fallbackNews = [
-  { id: '1', title: 'Pemerintah Bali Perketat Aturan Pembangunan Hotel di Area Pesisir', slug: 'pemerintah-bali-perketat-aturan-pembangunan-hotel-di-area-pesisir', category: 'TOURISM' },
-  { id: '2', title: 'Investor Asing Minati Proyek Energi Terbarukan di Bali Timur', slug: 'investor-asing-minati-proyek-energi-terbarukan-di-bali-timur', category: 'INVESTMENT' },
-  { id: '3', title: 'Kenaikan Harga Tiket Masuk Objek Wisata Diwisatakan Mulai Berlaku', slug: 'kenaikan-harga-tiket-masuk-objek-wisata-diwisatakan-mulai-berlaku', category: 'TOURISM' },
+  { id: '1', title: 'Bali Government Tightens Coastal Hotel Development Rules', slug: 'pemerintah-bali-perketat-aturan-pembangunan-hotel-di-area-pesisir', category: 'TOURISM' },
+  { id: '2', title: 'Foreign Investors Eye Renewable Energy Projects in East Bali', slug: 'investor-asing-minati-proyek-energi-terbarukan-di-bali-timur', category: 'INVESTMENT' },
+  { id: '3', title: 'Tourist Attraction Ticket Price Increase Takes Effect', slug: 'kenaikan-harga-tiket-masuk-objek-wisata-diwisatakan-mulai-berlaku', category: 'TOURISM' },
 ]
 
 export function BreakingNews() {

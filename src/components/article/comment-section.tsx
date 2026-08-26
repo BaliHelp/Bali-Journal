@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Send, AlertTriangle } from 'lucide-react'
+import { useLang } from '@/lib/use-lang'
 
 interface Comment {
   id: string
@@ -20,12 +21,37 @@ interface CommentSectionProps {
   comments: Comment[]
 }
 
+const translations = {
+  en: {
+    placeholder: 'Write your comment... (minimum 10 characters)',
+    genericSendError: 'Failed to submit comment',
+    genericError: 'Something went wrong',
+    pendingReview: 'Your comment is under review and will appear once approved.',
+    sending: 'Sending...',
+    send: 'Post Comment',
+    empty: 'No comments yet. Be the first!',
+    anonymous: 'Anonymous',
+  },
+  id: {
+    placeholder: 'Tulis komentar Anda... (minimal 10 karakter)',
+    genericSendError: 'Gagal mengirim komentar',
+    genericError: 'Terjadi kesalahan',
+    pendingReview: 'Komentar Anda sedang dalam peninjauan dan akan ditampilkan setelah disetujui.',
+    sending: 'Mengirim...',
+    send: 'Kirim Komentar',
+    empty: 'Belum ada komentar. Jadilah yang pertama!',
+    anonymous: 'Anonim',
+  },
+}
+
 export function CommentSection({ articleId, comments: initialComments }: CommentSectionProps) {
   const [comments, setComments] = useState(initialComments)
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const lang = useLang()
+  const t = translations[lang]
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -45,7 +71,7 @@ export function CommentSection({ articleId, comments: initialComments }: Comment
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Gagal mengirim komentar')
+        throw new Error(data.error || t.genericSendError)
       }
 
       if (data.status === 'PENDING') {
@@ -56,7 +82,7 @@ export function CommentSection({ articleId, comments: initialComments }: Comment
         setContent('')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      setError(err instanceof Error ? err.message : t.genericError)
     } finally {
       setLoading(false)
     }
@@ -69,11 +95,11 @@ export function CommentSection({ articleId, comments: initialComments }: Comment
         <Textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Tulis komentar Anda... (minimal 10 karakter)"
+          placeholder={t.placeholder}
           rows={4}
           disabled={loading}
         />
-        
+
         {error && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
@@ -84,7 +110,7 @@ export function CommentSection({ articleId, comments: initialComments }: Comment
         {success && (
           <Alert>
             <AlertDescription>
-              Komentar Anda sedang dalam peninjauan dan akan ditampilkan setelah disetujui.
+              {t.pendingReview}
             </AlertDescription>
           </Alert>
         )}
@@ -94,12 +120,12 @@ export function CommentSection({ articleId, comments: initialComments }: Comment
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Mengirim...
+                {t.sending}
               </>
             ) : (
               <>
                 <Send className="h-4 w-4 mr-2" />
-                Kirim Komentar
+                {t.send}
               </>
             )}
           </Button>
@@ -110,7 +136,7 @@ export function CommentSection({ articleId, comments: initialComments }: Comment
       <div className="space-y-4">
         {comments.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
-            Belum ada komentar. Jadilah yang pertama!
+            {t.empty}
           </p>
         ) : (
           comments.map((comment) => (
@@ -122,9 +148,9 @@ export function CommentSection({ articleId, comments: initialComments }: Comment
               </Avatar>
               <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{comment.user.name || 'Anonim'}</span>
+                  <span className="font-medium">{comment.user.name || t.anonymous}</span>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(comment.createdAt).toLocaleDateString('id-ID', {
+                    {new Date(comment.createdAt).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',

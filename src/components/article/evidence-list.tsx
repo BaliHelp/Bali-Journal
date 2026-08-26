@@ -1,5 +1,8 @@
+'use client'
+
 import { Badge } from '@/components/ui/badge'
 import { FileText, Image, Video, Music, ExternalLink, CheckCircle } from 'lucide-react'
+import { useLang } from '@/lib/use-lang'
 
 interface Evidence {
   id: string
@@ -21,19 +24,26 @@ const typeIcons: Record<string, typeof FileText> = {
   audio: Music,
 }
 
-const typeLabels: Record<string, string> = {
-  document: 'Dokumen',
-  image: 'Gambar',
-  video: 'Video',
-  audio: 'Audio',
+const typeLabels = {
+  en: { document: 'Document', image: 'Image', video: 'Video', audio: 'Audio' },
+  id: { document: 'Dokumen', image: 'Gambar', video: 'Video', audio: 'Audio' },
+} as const
+
+const translations = {
+  en: { heading: 'Supporting Evidence', verified: 'Verified', source: 'Source' },
+  id: { heading: 'Bukti Pendukung', verified: 'Terverifikasi', source: 'Sumber' },
 }
 
 export function EvidenceList({ evidences }: EvidenceListProps) {
+  const lang = useLang()
+  const t = translations[lang]
+  const labels = typeLabels[lang]
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold flex items-center gap-2">
         <FileText className="h-5 w-5" />
-        Bukti Pendukung ({evidences.length})
+        {t.heading} ({evidences.length})
       </h3>
       <div className="grid gap-3">
         {evidences.map((evidence) => {
@@ -49,12 +59,12 @@ export function EvidenceList({ evidences }: EvidenceListProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">
-                    {typeLabels[evidence.type] || evidence.type}
+                    {labels[evidence.type as keyof typeof labels] || evidence.type}
                   </span>
                   {evidence.verified && (
                     <Badge variant="outline" className="text-xs text-green-600 border-green-600">
                       <CheckCircle className="h-3 w-3 mr-1" />
-                      Terverifikasi
+                      {t.verified}
                     </Badge>
                   )}
                 </div>
@@ -64,7 +74,7 @@ export function EvidenceList({ evidences }: EvidenceListProps) {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Sumber: {evidence.source}
+                  {t.source}: {evidence.source}
                 </p>
               </div>
               <a

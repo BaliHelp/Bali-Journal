@@ -9,9 +9,59 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Mail, Lock, User, Building2, Phone, Eye, EyeOff } from 'lucide-react'
+import { useLang } from '@/lib/use-lang'
+
+const translations = {
+  en: {
+    title: 'Register as an Advertiser',
+    subtitle: 'Place your ads on Bali Journal',
+    companyName: 'Company Name',
+    companyNamePlaceholder: 'PT Example Bali',
+    contactName: 'Contact Person Name',
+    contactNamePlaceholder: 'Your name',
+    phone: 'Phone / WhatsApp Number',
+    email: 'Email',
+    emailPlaceholder: 'name@company.com',
+    password: 'Password',
+    confirmPassword: 'Confirm Password',
+    disclaimer: 'New accounts are reviewed by an admin before you can place ads.',
+    submit: 'Register',
+    submitting: 'Processing...',
+    haveAccount: 'Already have an advertiser account?',
+    login: 'Log in',
+    passwordMismatch: 'Passwords do not match',
+    passwordTooShort: 'Password must be at least 6 characters',
+    registerFailed: 'Registration failed',
+    genericError: 'Something went wrong',
+  },
+  id: {
+    title: 'Daftar Sebagai Pengiklan',
+    subtitle: 'Pasang iklan Anda di Bali Journal',
+    companyName: 'Nama Perusahaan',
+    companyNamePlaceholder: 'PT Contoh Bali',
+    contactName: 'Nama Penanggung Jawab',
+    contactNamePlaceholder: 'Nama Anda',
+    phone: 'Nomor Telepon / WhatsApp',
+    email: 'Email',
+    emailPlaceholder: 'nama@perusahaan.com',
+    password: 'Password',
+    confirmPassword: 'Konfirmasi Password',
+    disclaimer: 'Akun baru akan ditinjau admin sebelum bisa memasang iklan.',
+    submit: 'Daftar',
+    submitting: 'Memproses...',
+    haveAccount: 'Sudah punya akun pengiklan?',
+    login: 'Masuk',
+    passwordMismatch: 'Konfirmasi password tidak cocok',
+    passwordTooShort: 'Password minimal 6 karakter',
+    registerFailed: 'Registrasi gagal',
+    genericError: 'Terjadi kesalahan',
+  },
+}
 
 export default function AdvertiserRegisterPage() {
   const router = useRouter()
+  const lang = useLang()
+  const t = translations[lang]
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -27,12 +77,12 @@ export default function AdvertiserRegisterPage() {
     setError(null)
 
     if (password !== confirmPassword) {
-      setError('Konfirmasi password tidak cocok')
+      setError(t.passwordMismatch)
       return
     }
 
     if (password.length < 6) {
-      setError('Password minimal 6 karakter')
+      setError(t.passwordTooShort)
       return
     }
 
@@ -48,13 +98,13 @@ export default function AdvertiserRegisterPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Registrasi gagal')
+        throw new Error(data.error || t.registerFailed)
       }
 
       router.push('/advertiser')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      setError(err instanceof Error ? err.message : t.genericError)
     } finally {
       setLoading(false)
     }
@@ -64,9 +114,9 @@ export default function AdvertiserRegisterPage() {
     <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Daftar Sebagai Pengiklan</CardTitle>
+          <CardTitle className="text-2xl">{t.title}</CardTitle>
           <CardDescription>
-            Pasang iklan Anda di Bali Journal
+            {t.subtitle}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -78,13 +128,13 @@ export default function AdvertiserRegisterPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="companyName">Nama Perusahaan</Label>
+              <Label htmlFor="companyName">{t.companyName}</Label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="companyName"
                   type="text"
-                  placeholder="PT Contoh Bali"
+                  placeholder={t.companyNamePlaceholder}
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   className="pl-10"
@@ -95,13 +145,13 @@ export default function AdvertiserRegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">Nama Penanggung Jawab</Label>
+              <Label htmlFor="name">{t.contactName}</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="name"
                   type="text"
-                  placeholder="Nama Anda"
+                  placeholder={t.contactNamePlaceholder}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="pl-10"
@@ -112,7 +162,7 @@ export default function AdvertiserRegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Nomor Telepon / WhatsApp</Label>
+              <Label htmlFor="phone">{t.phone}</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -129,13 +179,13 @@ export default function AdvertiserRegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t.email}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="nama@perusahaan.com"
+                  placeholder={t.emailPlaceholder}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
@@ -146,7 +196,7 @@ export default function AdvertiserRegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t.password}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -170,7 +220,7 @@ export default function AdvertiserRegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
+              <Label htmlFor="confirmPassword">{t.confirmPassword}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -187,7 +237,7 @@ export default function AdvertiserRegisterPage() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Akun baru akan ditinjau admin sebelum bisa memasang iklan.
+              {t.disclaimer}
             </p>
           </CardContent>
 
@@ -196,17 +246,17 @@ export default function AdvertiserRegisterPage() {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Memproses...
+                  {t.submitting}
                 </>
               ) : (
-                'Daftar'
+                t.submit
               )}
             </Button>
 
             <p className="text-sm text-center text-muted-foreground">
-              Sudah punya akun pengiklan?{' '}
+              {t.haveAccount}{' '}
               <Link href="/login" className="text-primary hover:underline">
-                Masuk
+                {t.login}
               </Link>
             </p>
           </CardFooter>

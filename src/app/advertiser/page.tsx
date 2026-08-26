@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Loader2, Clock, XCircle, Plus } from 'lucide-react'
+import { useLang, type Lang } from '@/lib/use-lang'
 
 interface AdvertiserProfile {
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -54,23 +55,110 @@ interface PaymentInfo {
   bankAccountName: string | null
 }
 
+const translations = {
+  en: {
+    loadProfileFailed: 'Failed to load profile',
+    genericError: 'Something went wrong',
+    pickFileFirst: 'Choose an ad creative file first',
+    createAdFailed: 'Failed to create ad',
+    uploadProofFailed: 'Failed to upload payment proof',
+    pendingTitle: 'Awaiting Admin Approval',
+    pendingDesc: (name: string) => `Your advertiser account "${name}" is under review. You'll be able to place ads once approved.`,
+    rejectedTitle: 'Registration Rejected',
+    rejectedDefault: 'Your advertiser account was not approved.',
+    dashboardTitle: 'Advertiser Dashboard',
+    newAdTitle: 'Create New Ad',
+    newAdDesc: 'Pick a slot, upload your creative, and set the run dates',
+    noSlots: 'No ad slots are available for purchase right now.',
+    slotLabel: 'Ad Slot',
+    slotPlaceholder: 'Choose a slot',
+    perDay: '/day',
+    start: 'Start',
+    end: 'End',
+    destinationLink: 'Destination Link (optional)',
+    creativeFile: 'Creative File (image or .webm/.mp4 video)',
+    estimatedCost: 'Estimated cost',
+    days: 'days',
+    createAdBtn: 'Create Ad & Invoice',
+    myAdsTitle: 'My Ads',
+    colSlot: 'Slot',
+    colPeriod: 'Period',
+    colDuration: 'Duration',
+    colTimeLeft: 'Time Left',
+    colStatus: 'Status',
+    noAds: 'No ads yet.',
+    invoicesTitle: 'Invoices & Payment',
+    invoicesDesc: 'Transfer manually to the account below, then upload proof of payment',
+    bank: 'Bank',
+    accountNo: 'Account No.',
+    accountName: 'Account Name',
+    colInvoiceNo: 'Invoice No.',
+    colAmount: 'Amount',
+    colAction: 'Action',
+    noInvoices: 'No invoices yet.',
+    uploadProof: 'Upload Proof',
+  },
+  id: {
+    loadProfileFailed: 'Gagal memuat profil',
+    genericError: 'Terjadi kesalahan',
+    pickFileFirst: 'Pilih file creative iklan terlebih dahulu',
+    createAdFailed: 'Gagal membuat iklan',
+    uploadProofFailed: 'Gagal upload bukti transfer',
+    pendingTitle: 'Menunggu Persetujuan Admin',
+    pendingDesc: (name: string) => `Akun pengiklan "${name}" sedang ditinjau. Anda akan bisa memasang iklan setelah disetujui.`,
+    rejectedTitle: 'Pendaftaran Ditolak',
+    rejectedDefault: 'Akun pengiklan Anda tidak disetujui.',
+    dashboardTitle: 'Dashboard Pengiklan',
+    newAdTitle: 'Buat Iklan Baru',
+    newAdDesc: 'Pilih slot, unggah creative, dan tentukan periode tayang',
+    noSlots: 'Belum ada slot iklan yang tersedia untuk dibeli saat ini.',
+    slotLabel: 'Slot Iklan',
+    slotPlaceholder: 'Pilih slot',
+    perDay: '/hari',
+    start: 'Mulai',
+    end: 'Selesai',
+    destinationLink: 'Link Tujuan (opsional)',
+    creativeFile: 'File Creative (gambar atau video .webm/.mp4)',
+    estimatedCost: 'Estimasi biaya',
+    days: 'hari',
+    createAdBtn: 'Buat Iklan & Invoice',
+    myAdsTitle: 'Iklan Saya',
+    colSlot: 'Slot',
+    colPeriod: 'Periode',
+    colDuration: 'Durasi',
+    colTimeLeft: 'Sisa Waktu',
+    colStatus: 'Status',
+    noAds: 'Belum ada iklan.',
+    invoicesTitle: 'Invoice & Pembayaran',
+    invoicesDesc: 'Transfer manual ke rekening berikut, lalu unggah bukti transfer',
+    bank: 'Bank',
+    accountNo: 'No. Rekening',
+    accountName: 'Atas Nama',
+    colInvoiceNo: 'No. Invoice',
+    colAmount: 'Nominal',
+    colAction: 'Aksi',
+    noInvoices: 'Belum ada invoice.',
+    uploadProof: 'Upload Bukti',
+  },
+}
+
 function formatRupiah(amount: number): string {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
 }
 
-function adStatusLabel(ad: AdRow): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } {
-  if (ad.invoice?.status === 'REJECTED') return { label: 'Bukti Ditolak', variant: 'destructive' }
+function adStatusLabel(ad: AdRow, lang: Lang): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } {
+  if (ad.invoice?.status === 'REJECTED') return { label: lang === 'id' ? 'Bukti Ditolak' : 'Proof Rejected', variant: 'destructive' }
   if (!ad.isActive) {
-    if (ad.invoice?.status === 'VERIFYING') return { label: 'Menunggu Verifikasi', variant: 'secondary' }
-    return { label: 'Menunggu Pembayaran', variant: 'secondary' }
+    if (ad.invoice?.status === 'VERIFYING') return { label: lang === 'id' ? 'Menunggu Verifikasi' : 'Awaiting Verification', variant: 'secondary' }
+    return { label: lang === 'id' ? 'Menunggu Pembayaran' : 'Awaiting Payment', variant: 'secondary' }
   }
   const now = new Date()
-  if (new Date(ad.endDate) < now) return { label: 'Kadaluarsa', variant: 'outline' }
-  if (new Date(ad.startDate) > now) return { label: 'Terjadwal', variant: 'outline' }
-  return { label: 'Aktif', variant: 'default' }
+  if (new Date(ad.endDate) < now) return { label: lang === 'id' ? 'Kadaluarsa' : 'Expired', variant: 'outline' }
+  if (new Date(ad.startDate) > now) return { label: lang === 'id' ? 'Terjadwal' : 'Scheduled', variant: 'outline' }
+  return { label: lang === 'id' ? 'Aktif' : 'Active', variant: 'default' }
 }
 
-function durationInfo(ad: AdRow): { totalDays: number; remainingText: string } {
+function durationInfo(ad: AdRow, lang: Lang): { totalDays: number; remainingText: string } {
   const DAY_MS = 24 * 60 * 60 * 1000
   const start = new Date(ad.startDate)
   const end = new Date(ad.endDate)
@@ -80,18 +168,20 @@ function durationInfo(ad: AdRow): { totalDays: number; remainingText: string } {
   if (!ad.isActive) return { totalDays, remainingText: '-' }
   if (start > now) {
     const daysUntilStart = Math.ceil((start.getTime() - now.getTime()) / DAY_MS)
-    return { totalDays, remainingText: `Mulai dalam ${daysUntilStart} hari` }
+    return { totalDays, remainingText: lang === 'id' ? `Mulai dalam ${daysUntilStart} hari` : `Starts in ${daysUntilStart} days` }
   }
   if (end < now) {
     const daysAgo = Math.ceil((now.getTime() - end.getTime()) / DAY_MS)
-    return { totalDays, remainingText: `Berakhir ${daysAgo} hari lalu` }
+    return { totalDays, remainingText: lang === 'id' ? `Berakhir ${daysAgo} hari lalu` : `Ended ${daysAgo} days ago` }
   }
   const daysLeft = Math.ceil((end.getTime() - now.getTime()) / DAY_MS)
-  return { totalDays, remainingText: `${daysLeft} hari lagi` }
+  return { totalDays, remainingText: lang === 'id' ? `${daysLeft} hari lagi` : `${daysLeft} days left` }
 }
 
 export default function AdvertiserDashboardPage() {
   const router = useRouter()
+  const lang = useLang()
+  const t = translations[lang]
   const [authChecked, setAuthChecked] = useState(false)
   const [profile, setProfile] = useState<AdvertiserProfile | null>(null)
   const [slots, setSlots] = useState<SlotOption[]>([])
@@ -127,7 +217,7 @@ export default function AdvertiserDashboardPage() {
     try {
       const profileRes = await fetch('/api/advertiser/profile')
       const profileData = await profileRes.json()
-      if (!profileRes.ok) throw new Error(profileData.error || 'Gagal memuat profil')
+      if (!profileRes.ok) throw new Error(profileData.error || t.loadProfileFailed)
       setProfile(profileData.advertiser)
 
       if (profileData.advertiser?.status === 'APPROVED') {
@@ -144,10 +234,11 @@ export default function AdvertiserDashboardPage() {
         setPaymentInfo(paymentData)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      setError(err instanceof Error ? err.message : t.genericError)
     } finally {
       setLoading(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -164,7 +255,7 @@ export default function AdvertiserDashboardPage() {
   async function handleCreateAd(e: React.FormEvent) {
     e.preventDefault()
     if (!file) {
-      setError('Pilih file creative iklan terlebih dahulu')
+      setError(t.pickFileFirst)
       return
     }
     setSubmitting(true)
@@ -179,13 +270,13 @@ export default function AdvertiserDashboardPage() {
 
       const res = await fetch('/api/advertiser/ads', { method: 'POST', body: fd })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Gagal membuat iklan')
+      if (!res.ok) throw new Error(data.error || t.createAdFailed)
 
       setForm({ slotId: '', linkUrl: '', startDate: '', endDate: '' })
       setFile(null)
       await fetchAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      setError(err instanceof Error ? err.message : t.genericError)
     } finally {
       setSubmitting(false)
     }
@@ -199,10 +290,10 @@ export default function AdvertiserDashboardPage() {
       fd.append('file', proofFile)
       const res = await fetch(`/api/advertiser/invoices/${invoiceId}/proof`, { method: 'POST', body: fd })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Gagal upload bukti transfer')
+      if (!res.ok) throw new Error(data.error || t.uploadProofFailed)
       await fetchAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      setError(err instanceof Error ? err.message : t.genericError)
     } finally {
       setUploadingProofFor(null)
     }
@@ -224,9 +315,9 @@ export default function AdvertiserDashboardPage() {
         <Card>
           <CardHeader className="text-center">
             <Clock className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-            <CardTitle>Menunggu Persetujuan Admin</CardTitle>
+            <CardTitle>{t.pendingTitle}</CardTitle>
             <CardDescription>
-              Akun pengiklan &quot;{profile.companyName}&quot; sedang ditinjau. Anda akan bisa memasang iklan setelah disetujui.
+              {t.pendingDesc(profile.companyName)}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -240,9 +331,9 @@ export default function AdvertiserDashboardPage() {
         <Card>
           <CardHeader className="text-center">
             <XCircle className="h-10 w-10 mx-auto mb-2 text-destructive" />
-            <CardTitle>Pendaftaran Ditolak</CardTitle>
+            <CardTitle>{t.rejectedTitle}</CardTitle>
             <CardDescription>
-              {profile.rejectionReason || 'Akun pengiklan Anda tidak disetujui.'}
+              {profile.rejectionReason || t.rejectedDefault}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -253,7 +344,7 @@ export default function AdvertiserDashboardPage() {
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Dashboard Pengiklan</h1>
+        <h1 className="text-2xl font-bold">{t.dashboardTitle}</h1>
         <p className="text-muted-foreground">{profile.companyName}</p>
       </div>
 
@@ -265,16 +356,16 @@ export default function AdvertiserDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Buat Iklan Baru</CardTitle>
-          <CardDescription>Pilih slot, unggah creative, dan tentukan periode tayang</CardDescription>
+          <CardTitle>{t.newAdTitle}</CardTitle>
+          <CardDescription>{t.newAdDesc}</CardDescription>
         </CardHeader>
         <CardContent>
           {slots.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada slot iklan yang tersedia untuk dibeli saat ini.</p>
+            <p className="text-sm text-muted-foreground">{t.noSlots}</p>
           ) : (
             <form onSubmit={handleCreateAd} className="space-y-4">
               <div className="space-y-2">
-                <Label>Slot Iklan</Label>
+                <Label>{t.slotLabel}</Label>
                 <Select
                   value={form.slotId}
                   onValueChange={(v) => {
@@ -294,11 +385,11 @@ export default function AdvertiserDashboardPage() {
                     }
                   }}
                 >
-                  <SelectTrigger><SelectValue placeholder="Pilih slot" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t.slotPlaceholder} /></SelectTrigger>
                   <SelectContent>
                     {slots.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name} ({s.width}x{s.height} px) - {formatRupiah(s.pricePerDay)}/hari
+                        {s.name} ({s.width}x{s.height} px) - {formatRupiah(s.pricePerDay)}{t.perDay}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -306,30 +397,30 @@ export default function AdvertiserDashboardPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Mulai</Label>
+                  <Label>{t.start}</Label>
                   <Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Selesai</Label>
+                  <Label>{t.end}</Label>
                   <Input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Link Tujuan (opsional)</Label>
+                <Label>{t.destinationLink}</Label>
                 <Input type="url" placeholder="https://..." value={form.linkUrl} onChange={(e) => setForm({ ...form, linkUrl: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>File Creative (gambar atau video .webm/.mp4)</Label>
+                <Label>{t.creativeFile}</Label>
                 <Input type="file" accept="image/*,video/webm,video/mp4" onChange={(e) => setFile(e.target.files?.[0] || null)} required />
               </div>
               {estimatedTotal > 0 && (
                 <p className="text-sm">
-                  Estimasi biaya: <span className="font-semibold">{formatRupiah(estimatedTotal)}</span> ({days} hari)
+                  {t.estimatedCost}: <span className="font-semibold">{formatRupiah(estimatedTotal)}</span> ({days} {t.days})
                 </p>
               )}
               <Button type="submit" disabled={submitting || !form.slotId}>
                 {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-                Buat Iklan & Invoice
+                {t.createAdBtn}
               </Button>
             </form>
           )}
@@ -338,30 +429,30 @@ export default function AdvertiserDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Iklan Saya</CardTitle>
+          <CardTitle>{t.myAdsTitle}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Slot</TableHead>
-                <TableHead>Periode</TableHead>
-                <TableHead>Durasi</TableHead>
-                <TableHead>Sisa Waktu</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{t.colSlot}</TableHead>
+                <TableHead>{t.colPeriod}</TableHead>
+                <TableHead>{t.colDuration}</TableHead>
+                <TableHead>{t.colTimeLeft}</TableHead>
+                <TableHead>{t.colStatus}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {ads.map((ad) => {
-                const status = adStatusLabel(ad)
-                const duration = durationInfo(ad)
+                const status = adStatusLabel(ad, lang)
+                const duration = durationInfo(ad, lang)
                 return (
                   <TableRow key={ad.id}>
                     <TableCell className="font-medium">{ad.slot?.name}</TableCell>
                     <TableCell className="text-xs">
-                      {new Date(ad.startDate).toLocaleDateString('id-ID')} - {new Date(ad.endDate).toLocaleDateString('id-ID')}
+                      {new Date(ad.startDate).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')} - {new Date(ad.endDate).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')}
                     </TableCell>
-                    <TableCell className="text-xs">{duration.totalDays} hari</TableCell>
+                    <TableCell className="text-xs">{duration.totalDays} {t.days}</TableCell>
                     <TableCell className="text-xs">{duration.remainingText}</TableCell>
                     <TableCell><Badge variant={status.variant}>{status.label}</Badge></TableCell>
                   </TableRow>
@@ -369,7 +460,7 @@ export default function AdvertiserDashboardPage() {
               })}
               {ads.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Belum ada iklan.</TableCell>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">{t.noAds}</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -379,24 +470,24 @@ export default function AdvertiserDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Invoice & Pembayaran</CardTitle>
-          <CardDescription>Transfer manual ke rekening berikut, lalu unggah bukti transfer</CardDescription>
+          <CardTitle>{t.invoicesTitle}</CardTitle>
+          <CardDescription>{t.invoicesDesc}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {paymentInfo?.bankAccountNo && (
             <div className="p-4 rounded-lg border bg-muted/30 text-sm">
-              <p><span className="text-muted-foreground">Bank:</span> {paymentInfo.bankName}</p>
-              <p><span className="text-muted-foreground">No. Rekening:</span> {paymentInfo.bankAccountNo}</p>
-              <p><span className="text-muted-foreground">Atas Nama:</span> {paymentInfo.bankAccountName}</p>
+              <p><span className="text-muted-foreground">{t.bank}:</span> {paymentInfo.bankName}</p>
+              <p><span className="text-muted-foreground">{t.accountNo}:</span> {paymentInfo.bankAccountNo}</p>
+              <p><span className="text-muted-foreground">{t.accountName}:</span> {paymentInfo.bankAccountName}</p>
             </div>
           )}
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>No. Invoice</TableHead>
-                <TableHead>Nominal</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
+                <TableHead>{t.colInvoiceNo}</TableHead>
+                <TableHead>{t.colAmount}</TableHead>
+                <TableHead>{t.colStatus}</TableHead>
+                <TableHead className="text-right">{t.colAction}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -434,7 +525,7 @@ export default function AdvertiserDashboardPage() {
                           disabled={uploadingProofFor !== null}
                           onClick={() => document.getElementById(`proof-upload-${ad.invoice!.id}`)?.click()}
                         >
-                          {uploadingProofFor === ad.invoice!.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Upload Bukti'}
+                          {uploadingProofFor === ad.invoice!.id ? <Loader2 className="h-4 w-4 animate-spin" /> : t.uploadProof}
                         </Button>
                       </>
                     )}
@@ -443,7 +534,7 @@ export default function AdvertiserDashboardPage() {
               ))}
               {ads.filter((ad) => ad.invoice).length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Belum ada invoice.</TableCell>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">{t.noInvoices}</TableCell>
                 </TableRow>
               )}
             </TableBody>

@@ -21,6 +21,10 @@ import { EvidenceList } from '@/components/article/evidence-list'
 import { ArticleCard } from '@/components/article/article-card'
 import { ArticleActions } from '@/components/article/article-actions'
 import { AdSlot, AdMedia, getActiveAd } from '@/components/ads/ad-slot'
+import { LangText } from '@/components/i18n/lang-text'
+import { CategoryLabel } from '@/components/i18n/category-label'
+import { RiskLabel } from '@/components/i18n/risk-label'
+import { ArticleDate } from '@/components/article/article-date'
 import type { Category } from '@prisma/client'
 
 interface ArticlePageProps {
@@ -80,21 +84,11 @@ async function getOtherCategoryArticles(excludeId: string, excludeCategory: Cate
   return results.filter((a): a is NonNullable<typeof a> => a !== null)
 }
 
-const categoryLabels: Record<string, string> = {
-  TOURISM: 'Pariwisata',
-  GOVERNMENT: 'Pemerintahan',
-  INVESTMENT: 'Investasi',
-  INCIDENTS: 'Insiden',
-  LOCAL: 'Lokal',
-  JOBS: 'Pekerjaan',
-  OPINION: 'Opini',
-}
-
-const riskLevelLabels: Record<string, { label: string; color: string }> = {
-  LOW: { label: 'Rendah', color: 'bg-green-500' },
-  MEDIUM: { label: 'Sedang', color: 'bg-yellow-500' },
-  HIGH: { label: 'Tinggi', color: 'bg-orange-500' },
-  CRITICAL: { label: 'Kritis', color: 'bg-red-500' },
+const riskLevelColors: Record<string, string> = {
+  LOW: 'bg-green-500',
+  MEDIUM: 'bg-yellow-500',
+  HIGH: 'bg-orange-500',
+  CRITICAL: 'bg-red-500',
 }
 
 export async function generateMetadata({ params }: ArticlePageProps) {
@@ -102,7 +96,7 @@ export async function generateMetadata({ params }: ArticlePageProps) {
   const article = await getArticle(slug)
 
   if (!article) {
-    return { title: 'Artikel tidak ditemukan' }
+    return { title: 'Article not found' }
   }
 
   return {
@@ -113,7 +107,7 @@ export async function generateMetadata({ params }: ArticlePageProps) {
       description: article.excerpt,
       type: 'article',
       publishedTime: article.publishedAt?.toISOString(),
-      authors: [article.author?.name || 'Tim Bali Journal'],
+      authors: [article.author?.name || 'Bali Journal Team'],
       images: article.featuredImageUrl ? [{ url: article.featuredImageUrl }] : [],
     },
     twitter: {
@@ -166,13 +160,13 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         <div className="max-w-4xl w-full min-w-0">
           {/* Breadcrumb */}
           <nav className="mb-6 text-sm text-muted-foreground">
-            <Link href="/" className="hover:text-foreground">Beranda</Link>
+            <Link href="/" className="hover:text-foreground"><LangText en="Home" id="Beranda" /></Link>
             <span className="mx-2">/</span>
             <Link
               href={`/category/${article.category.toLowerCase()}`}
               className="hover:text-foreground"
             >
-              {categoryLabels[article.category]}
+              <CategoryLabel category={article.category} />
             </Link>
             <span className="mx-2">/</span>
             <span className="text-foreground">{article.title.slice(0, 50)}...</span>
@@ -182,14 +176,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <header className="mb-8">
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <Badge variant="secondary">
-                {categoryLabels[article.category]}
+                <CategoryLabel category={article.category} />
               </Badge>
               <Badge
                 variant="outline"
                 className="flex items-center gap-1"
               >
                 <Shield className="h-3 w-3" />
-                Terverifikasi
+                <LangText en="Verified" id="Terverifikasi" />
               </Badge>
             </div>
 
@@ -204,16 +198,12 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                <span>{article.author?.name || 'Tim Bali Journal'}</span>
+                <span>{article.author?.name || <LangText en="Bali Journal Team" id="Tim Bali Journal" />}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
                 <span>
-                  {article.publishedAt?.toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
+                  <ArticleDate date={article.publishedAt} />
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -237,7 +227,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               </div>
               {article.imageSource && (
                 <figcaption className="mt-2 text-sm text-muted-foreground text-center">
-                  Sumber: {article.imageSource}
+                  <LangText en="Source" id="Sumber" />: {article.imageSource}
                 </figcaption>
               )}
             </figure>
@@ -266,30 +256,30 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <div className="p-4 rounded-lg border bg-muted/30">
               <div className="flex items-center gap-2 mb-2">
                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Tingkat Risiko</span>
+                <span className="text-sm font-medium"><LangText en="Risk Level" id="Tingkat Risiko" /></span>
               </div>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${riskLevelLabels[article.riskLevel]?.color}`} />
+                <div className={`w-2 h-2 rounded-full ${riskLevelColors[article.riskLevel]}`} />
                 <span className="font-semibold">
-                  {riskLevelLabels[article.riskLevel]?.label || article.riskLevel}
+                  <RiskLabel level={article.riskLevel} />
                 </span>
               </div>
             </div>
             <div className="p-4 rounded-lg border bg-muted/30">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Verifikasi</span>
+                <span className="text-sm font-medium"><LangText en="Verification" id="Verifikasi" /></span>
               </div>
               <span className="font-semibold">
-                {article.evidences.filter(e => e.verified).length} dari {article.evidences.length} bukti terverifikasi
+                {article.evidences.filter(e => e.verified).length} <LangText en="of" id="dari" /> {article.evidences.length} <LangText en="evidence verified" id="bukti terverifikasi" />
               </span>
             </div>
             <div className="p-4 rounded-lg border bg-muted/30">
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Bukti Pendukung</span>
+                <span className="text-sm font-medium"><LangText en="Supporting Evidence" id="Bukti Pendukung" /></span>
               </div>
-              <span className="font-semibold">{article.evidences.length} dokumen</span>
+              <span className="font-semibold">{article.evidences.length} <LangText en="documents" id="dokumen" /></span>
             </div>
           </div>
 
@@ -302,7 +292,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           {otherCategoryArticles.length > 0 && (
             <>
               <div className="mb-8">
-                <h2 className="text-xl font-semibold mb-6">Baca Juga dari Kategori Lain</h2>
+                <h2 className="text-xl font-semibold mb-6">
+                  <LangText en="Read Also from Other Categories" id="Baca Juga dari Kategori Lain" />
+                </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {otherCategoryArticles.map((related) => (
                     <ArticleCard key={related.id} article={related} />
@@ -318,7 +310,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <div className="flex items-center gap-2 mb-6">
               <MessageCircle className="h-5 w-5" />
               <h2 className="text-xl font-semibold">
-                Komentar ({article.comments.length})
+                <LangText en="Comments" id="Komentar" /> ({article.comments.length})
               </h2>
             </div>
             <CommentSection
