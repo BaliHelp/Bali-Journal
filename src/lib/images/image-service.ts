@@ -196,8 +196,8 @@ async function downloadImage(
     }
 }
 
-/** Writes the image to disk and returns its public web path. */
-async function persistImage(
+/** Writes the image to disk and returns its public web path. Exported so upload endpoints (e.g. manual admin image uploads) can reuse the same storage convention as AI-generated images. */
+export async function persistImage(
     buffer: Buffer,
     contentType: string,
     baseName: string
@@ -373,7 +373,7 @@ export async function generateAndStoreImage(
 // ---------------------------------------------------------------------------
 
 /** Splits HTML into top-level `<p>...</p>` blocks (non-paragraph markup, e.g. stray <h3>, stays attached to the following block). */
-function splitIntoParagraphBlocks(html: string): string[] {
+export function splitIntoParagraphBlocks(html: string): string[] {
     const pieces = html.split(/(<\/p>)/i)
     const blocks: string[] = []
     let pending = ''

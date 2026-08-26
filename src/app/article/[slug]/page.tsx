@@ -20,6 +20,7 @@ import { CommentSection } from '@/components/article/comment-section'
 import { EvidenceList } from '@/components/article/evidence-list'
 import { ArticleCard } from '@/components/article/article-card'
 import { ArticleActions } from '@/components/article/article-actions'
+import { AdSlot } from '@/components/ads/ad-slot'
 import type { Category } from '@prisma/client'
 
 interface ArticlePageProps {
@@ -227,6 +228,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             className="prose prose-neutral dark:prose-invert max-w-none mb-8"
             dangerouslySetInnerHTML={{ __html: article.content }}
           />
+
+          <AdSlot position="IN_ARTICLE" className="my-8" />
 
           <Separator className="my-8" />
 

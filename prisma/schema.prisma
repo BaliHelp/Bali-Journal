@@ -271,6 +271,60 @@ model AgentMemory {
   @@map("agent_memories")
 }
 
+// ==============================================================================
+// ADS (Fase 1: dikelola admin sepenuhnya - belum ada dashboard advertiser
+// self-service/invoice/payment, itu Fase 2 terpisah).
+// ==============================================================================
+
+enum AdPosition {
+  HEADER
+  SIDEBAR
+  IN_ARTICLE
+  FOOTER
+  MOBILE_BANNER
+}
+
+enum AdDevice {
+  DESKTOP
+  MOBILE
+  BOTH
+}
+
+enum AdMediaType {
+  IMAGE
+  VIDEO
+}
+
+model AdSlot {
+  id        String     @id @default(uuid())
+  name      String
+  position  AdPosition
+  device    AdDevice
+  width     Int
+  height    Int
+  ads       Ad[]
+  createdAt DateTime   @default(now())
+
+  @@map("ad_slots")
+}
+
+model Ad {
+  id             String      @id @default(uuid())
+  slotId         String
+  slot           AdSlot      @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  advertiserName String
+  mediaUrl       String
+  mediaType      AdMediaType
+  linkUrl        String?
+  startDate      DateTime
+  endDate        DateTime
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+
+  @@index([slotId])
+  @@map("ads")
+}
+
 // Contact Form Submissions
 model ContactSubmission {
   id        String   @id @default(cuid())

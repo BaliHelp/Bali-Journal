@@ -69,7 +69,10 @@ import {
   Brain,
   Zap,
   Activity,
-  RefreshCw
+  RefreshCw,
+  List,
+  Megaphone,
+  Upload
 } from 'lucide-react'
 import Image from 'next/image'
 import { AiControls } from '@/components/admin/ai-controls'
@@ -92,6 +95,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Konten',
     items: [
+      { value: 'listnews', label: 'List News', icon: List },
       { value: 'articles', label: 'Articles', icon: FileText },
       { value: 'comments', label: 'Comments', icon: MessageCircle },
     ],
@@ -102,6 +106,10 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { value: 'users', label: 'Users', icon: Users },
       { value: 'reports', label: 'Reports', icon: BarChart3 },
     ],
+  },
+  {
+    label: 'Monetisasi',
+    items: [{ value: 'ads', label: 'Ads', icon: Megaphone }],
   },
   {
     label: 'Sistem',
@@ -145,6 +153,29 @@ const riskColors: Record<string, string> = {
   MEDIUM: 'bg-yellow-500',
   HIGH: 'bg-orange-500',
   CRITICAL: 'bg-red-500',
+}
+
+interface AdSlotRow {
+  id: string
+  name: string
+  position: string
+  device: string
+  width: number
+  height: number
+  ads: { id: string; isActive: boolean }[]
+}
+
+interface AdRow {
+  id: string
+  slotId: string
+  slot: AdSlotRow
+  advertiserName: string
+  mediaUrl: string
+  mediaType: 'IMAGE' | 'VIDEO'
+  linkUrl: string | null
+  startDate: string
+  endDate: string
+  isActive: boolean
 }
 
 interface Article {
@@ -208,6 +239,7 @@ export default function MasterAdminDashboard() {
 
   // Data states
   const [articles, setArticles] = useState<Article[]>([])
+  const [listNewsSearch, setListNewsSearch] = useState('')
   const [reports, setReports] = useState<Report[]>([])
   const [comments, setComments] = useState<Comment[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -245,6 +277,130 @@ export default function MasterAdminDashboard() {
     containsAccusation: boolean
     recommendations: string[]
   } | null>(null)
+
+  // Photo upload state (article edit dialog)
+  const [uploadingSlot, setUploadingSlot] = useState<'top' | 'middle' | 'bottom' | null>(null)
+
+  // Ads panel state
+  const [adSlots, setAdSlots] = useState<AdSlotRow[]>([])
+  const [ads, setAds] = useState<AdRow[]>([])
+  const [showAdSlotDialog, setShowAdSlotDialog] = useState(false)
+  const [showAdDialog, setShowAdDialog] = useState(false)
+  const [adSlotForm, setAdSlotForm] = useState({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90 })
+  const [adForm, setAdForm] = useState({ slotId: '', advertiserName: '', linkUrl: '', startDate: '', endDate: '' })
+  const [adFile, setAdFile] = useState<File | null>(null)
+  const [adsLoading, setAdsLoading] = useState(false)
+
+  async function fetchAdsData() {
+    setAdsLoading(true)
+    try {
+      const [slotsRes, adsRes] = await Promise.all([
+        fetch('/api/admin/ad-slots'),
+        fetch('/api/admin/ads'),
+      ])
+      const slotsData = slotsRes.ok ? await slotsRes.json() : { slots: [] }
+      const adsData = adsRes.ok ? await adsRes.json() : { ads: [] }
+      if (Array.isArray(slotsData.slots)) setAdSlots(slotsData.slots)
+      if (Array.isArray(adsData.ads)) setAds(adsData.ads)
+    } catch (err) {
+      console.error('Error fetching ads data:', err)
+    } finally {
+      setAdsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'ads' && adSlots.length === 0 && ads.length === 0) {
+      fetchAdsData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  async function handleCreateAdSlot(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/ad-slots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(adSlotForm),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create ad slot')
+      setSuccess('Ad slot created!')
+      setShowAdSlotDialog(false)
+      setAdSlotForm({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90 })
+      fetchAdsData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create ad slot')
+    }
+  }
+
+  async function handleDeleteAdSlot(id: string) {
+    if (!confirm('Hapus slot iklan ini? Semua iklan di dalamnya ikut terhapus.')) return
+    try {
+      const res = await fetch(`/api/admin/ad-slots/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete')
+      setSuccess('Ad slot deleted!')
+      fetchAdsData()
+    } catch {
+      setError('Failed to delete ad slot')
+    }
+  }
+
+  async function handleCreateAd(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (!adFile) {
+      setError('Pilih file gambar/video dulu')
+      return
+    }
+    try {
+      const formData = new FormData()
+      formData.append('slotId', adForm.slotId)
+      formData.append('advertiserName', adForm.advertiserName)
+      formData.append('linkUrl', adForm.linkUrl)
+      formData.append('startDate', adForm.startDate)
+      formData.append('endDate', adForm.endDate)
+      formData.append('file', adFile)
+
+      const res = await fetch('/api/admin/ads', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create ad')
+      setSuccess('Ad created!')
+      setShowAdDialog(false)
+      setAdForm({ slotId: '', advertiserName: '', linkUrl: '', startDate: '', endDate: '' })
+      setAdFile(null)
+      fetchAdsData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create ad')
+    }
+  }
+
+  async function handleToggleAdActive(id: string, isActive: boolean) {
+    try {
+      await fetch(`/api/admin/ads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !isActive }),
+      })
+      fetchAdsData()
+    } catch {
+      setError('Failed to update ad')
+    }
+  }
+
+  async function handleDeleteAd(id: string) {
+    if (!confirm('Hapus iklan ini?')) return
+    try {
+      const res = await fetch(`/api/admin/ads/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete')
+      setSuccess('Ad deleted!')
+      fetchAdsData()
+    } catch {
+      setError('Failed to delete ad')
+    }
+  }
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -392,6 +548,43 @@ export default function MasterAdminDashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handlePhotoUpload(position: 'top' | 'middle' | 'bottom', file: File) {
+    if (!editingArticle) return
+
+    setUploadingSlot(position)
+    setError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('position', position)
+
+      const res = await fetch(`/api/admin/articles/${editingArticle.id}/upload-image`, {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload photo')
+      }
+
+      setSuccess(`Photo uploaded (${position}) and converted to WebP!`)
+      setEditingArticle(data.article)
+      fetchAllData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload photo')
+    } finally {
+      setUploadingSlot(null)
+    }
+  }
+
+  function photoCount(article: Article | null): number {
+    if (!article) return 0
+    const inContent = (article.content.match(/<img\b/gi) || []).length
+    return inContent + (article.featuredImageUrl ? 1 : 0)
   }
 
   async function handleDeleteArticle(id: string) {
@@ -688,6 +881,57 @@ export default function MasterAdminDashboard() {
             </div>
           </TabsContent>
 
+          <TabsContent value="listnews">
+            <Card>
+              <CardHeader>
+                <CardTitle>List News</CardTitle>
+                <CardDescription>Semua berita - Kategori, Judul, dan Ringkasan singkat</CardDescription>
+                <div className="pt-2">
+                  <Input
+                    placeholder="Cari judul atau kategori..."
+                    value={listNewsSearch}
+                    onChange={(e) => setListNewsSearch(e.target.value)}
+                    className="max-w-sm"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[140px]">Category</TableHead>
+                      <TableHead>Judul Berita</TableHead>
+                      <TableHead>Short Description</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {articles
+                      .filter((a) => {
+                        const q = listNewsSearch.toLowerCase()
+                        return !q || a.title.toLowerCase().includes(q) || a.category.toLowerCase().includes(q)
+                      })
+                      .map((a) => (
+                        <TableRow key={a.id}>
+                          <TableCell>
+                            <Badge variant="secondary">{a.category}</Badge>
+                          </TableCell>
+                          <TableCell className="font-medium max-w-xs">{a.title}</TableCell>
+                          <TableCell className="text-muted-foreground max-w-md">{a.excerpt}</TableCell>
+                        </TableRow>
+                      ))}
+                    {articles.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                          Belum ada berita.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="articles">
             <Card>
               <CardHeader>
@@ -847,6 +1091,51 @@ export default function MasterAdminDashboard() {
                             </div>
                           )}
                         </div>
+
+                        {editingArticle ? (
+                          <div className="space-y-2 border-t pt-4">
+                            <Label className="flex items-center gap-2">
+                              <ImageIcon className="h-4 w-4" />
+                              Foto Artikel ({photoCount(editingArticle)}/3) - dikonversi otomatis ke WebP
+                            </Label>
+                            <div className="flex flex-wrap gap-2">
+                              {(['top', 'middle', 'bottom'] as const).map((slot) => (
+                                <div key={slot}>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    id={`photo-upload-${slot}`}
+                                    disabled={uploadingSlot !== null || photoCount(editingArticle) >= 3}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0]
+                                      if (file) handlePhotoUpload(slot, file)
+                                      e.target.value = ''
+                                    }}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={uploadingSlot !== null || photoCount(editingArticle) >= 3}
+                                    onClick={() => document.getElementById(`photo-upload-${slot}`)?.click()}
+                                  >
+                                    {uploadingSlot === slot ? (
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    ) : (
+                                      <Upload className="h-4 w-4 mr-2" />
+                                    )}
+                                    {slot === 'top' ? 'Foto Utama' : slot === 'middle' ? 'Foto Tengah' : 'Foto Bawah'}
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground border-t pt-4">
+                            Simpan artikel dulu untuk bisa upload foto.
+                          </p>
+                        )}
 
                         <DialogFooter>
                           <Button type="button" variant="outline" onClick={() => setShowArticleDialog(false)}>
@@ -1137,6 +1426,261 @@ export default function MasterAdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="ads">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Ad Slots</CardTitle>
+                      <CardDescription>Definisikan ukuran & posisi slot iklan (standar IAB)</CardDescription>
+                    </div>
+                    <Dialog open={showAdSlotDialog} onOpenChange={setShowAdSlotDialog}>
+                      <DialogTrigger asChild>
+                        <Button size="sm"><Plus className="h-4 w-4 mr-2" />New Slot</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>New Ad Slot</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleCreateAdSlot} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Nama Slot</Label>
+                            <Input
+                              value={adSlotForm.name}
+                              onChange={(e) => setAdSlotForm({ ...adSlotForm, name: e.target.value })}
+                              placeholder="Header Leaderboard"
+                              required
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Posisi</Label>
+                              <Select value={adSlotForm.position} onValueChange={(v) => setAdSlotForm({ ...adSlotForm, position: v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {['HEADER', 'SIDEBAR', 'IN_ARTICLE', 'FOOTER', 'MOBILE_BANNER'].map((p) => (
+                                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Device</Label>
+                              <Select value={adSlotForm.device} onValueChange={(v) => setAdSlotForm({ ...adSlotForm, device: v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {['DESKTOP', 'MOBILE', 'BOTH'].map((d) => (
+                                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Width (px)</Label>
+                              <Input
+                                type="number"
+                                value={adSlotForm.width}
+                                onChange={(e) => setAdSlotForm({ ...adSlotForm, width: Number(e.target.value) })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Height (px)</Label>
+                              <Input
+                                type="number"
+                                value={adSlotForm.height}
+                                onChange={(e) => setAdSlotForm({ ...adSlotForm, height: Number(e.target.value) })}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Standar IAB: Leaderboard 728x90, Medium Rectangle 300x250, Mobile Banner 320x50.
+                          </p>
+                          <DialogFooter>
+                            <Button type="submit">Save Slot</Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nama</TableHead>
+                        <TableHead>Posisi</TableHead>
+                        <TableHead>Device</TableHead>
+                        <TableHead>Ukuran</TableHead>
+                        <TableHead>Iklan Aktif</TableHead>
+                        <TableHead className="text-right">Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {adSlots.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium">{s.name}</TableCell>
+                          <TableCell><Badge variant="secondary">{s.position}</Badge></TableCell>
+                          <TableCell>{s.device}</TableCell>
+                          <TableCell>{s.width}x{s.height}</TableCell>
+                          <TableCell>{s.ads.filter((a) => a.isActive).length}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteAdSlot(s.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {adSlots.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            {adsLoading ? 'Loading...' : 'Belum ada ad slot. Buat satu dulu sebelum menambah iklan.'}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Ads</CardTitle>
+                      <CardDescription>Kelola iklan yang tayang (gambar atau video WebM/MP4)</CardDescription>
+                    </div>
+                    <Dialog open={showAdDialog} onOpenChange={setShowAdDialog}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" disabled={adSlots.length === 0}>
+                          <Plus className="h-4 w-4 mr-2" />New Ad
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>New Ad</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleCreateAd} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Ad Slot</Label>
+                            <Select value={adForm.slotId} onValueChange={(v) => setAdForm({ ...adForm, slotId: v })}>
+                              <SelectTrigger><SelectValue placeholder="Pilih slot" /></SelectTrigger>
+                              <SelectContent>
+                                {adSlots.map((s) => (
+                                  <SelectItem key={s.id} value={s.id}>{s.name} ({s.width}x{s.height})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Nama Advertiser</Label>
+                            <Input
+                              value={adForm.advertiserName}
+                              onChange={(e) => setAdForm({ ...adForm, advertiserName: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Link Tujuan (opsional)</Label>
+                            <Input
+                              type="url"
+                              value={adForm.linkUrl}
+                              onChange={(e) => setAdForm({ ...adForm, linkUrl: e.target.value })}
+                              placeholder="https://..."
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Mulai</Label>
+                              <Input
+                                type="date"
+                                value={adForm.startDate}
+                                onChange={(e) => setAdForm({ ...adForm, startDate: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Selesai</Label>
+                              <Input
+                                type="date"
+                                value={adForm.endDate}
+                                onChange={(e) => setAdForm({ ...adForm, endDate: e.target.value })}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>File (gambar atau video .webm/.mp4)</Label>
+                            <Input
+                              type="file"
+                              accept="image/*,video/webm,video/mp4"
+                              onChange={(e) => setAdFile(e.target.files?.[0] || null)}
+                              required
+                            />
+                          </div>
+                          <DialogFooter>
+                            <Button type="submit">Save Ad</Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Advertiser</TableHead>
+                        <TableHead>Slot</TableHead>
+                        <TableHead>Tipe</TableHead>
+                        <TableHead>Periode</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ads.map((ad) => (
+                        <TableRow key={ad.id}>
+                          <TableCell className="font-medium">{ad.advertiserName}</TableCell>
+                          <TableCell>{ad.slot?.name}</TableCell>
+                          <TableCell>{ad.mediaType}</TableCell>
+                          <TableCell className="text-xs">
+                            {new Date(ad.startDate).toLocaleDateString('id-ID')} - {new Date(ad.endDate).toLocaleDateString('id-ID')}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={ad.isActive ? 'default' : 'outline'}
+                              className="cursor-pointer"
+                              onClick={() => handleToggleAdActive(ad.id, ad.isActive)}
+                            >
+                              {ad.isActive ? 'Active' : 'Paused'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteAd(ad.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {ads.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            {adsLoading ? 'Loading...' : 'Belum ada iklan.'}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="ai">
