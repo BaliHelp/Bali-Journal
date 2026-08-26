@@ -1,26 +1,46 @@
 import { db } from '@/lib/db'
+import type { Ad, AdSlot as AdSlotModel } from '@prisma/client'
+
+export type AdPositionValue =
+  | 'HEADER'
+  | 'SIDEBAR'
+  | 'IN_ARTICLE'
+  | 'FOOTER'
+  | 'MOBILE_BANNER'
+  | 'HOME_HERO_LEFT'
+  | 'HOME_HERO_MINI'
+  | 'HOME_HERO_BELOW'
+  | 'ARTICLE_LEFT'
+  | 'ARTICLE_RIGHT_TOP'
+  | 'ARTICLE_RIGHT_BOTTOM'
+
+type AdDeviceValue = 'DESKTOP' | 'MOBILE' | 'BOTH'
 
 interface AdSlotProps {
-  position: 'HEADER' | 'SIDEBAR' | 'IN_ARTICLE' | 'FOOTER' | 'MOBILE_BANNER'
+  position: AdPositionValue
   /** Which viewport this instance renders for - controls the responsive show/hide class (CSS-only, no layout shift/JS device detection). */
-  device?: 'DESKTOP' | 'MOBILE' | 'BOTH'
+  device?: AdDeviceValue
   className?: string
 }
 
-const DEVICE_CLASS: Record<NonNullable<AdSlotProps['device']>, string> = {
-  DESKTOP: 'hidden md:block',
-  MOBILE: 'block md:hidden',
-  BOTH: '',
+const DEVICE_CLASS: Record<AdDeviceValue, string> = {
+  DESKTOP: 'hidden md:flex',
+  MOBILE: 'flex md:hidden',
+  BOTH: 'flex',
 }
 
 /**
- * Server component - queries active ads directly (no extra round-trip via
- * the public /api/ads/active endpoint, that one exists for client-side
- * fetches if a page ever needs to refresh ads without a full reload).
- * Renders nothing if there's no active ad for this slot/device, so it never
- * leaves an empty gap.
+ * Shared query, used by the AdSlot component itself AND by pages that need
+ * to know ahead of render whether a position has an active ad - e.g. the
+ * homepage hero rail and the article side rails only reserve their grid
+ * column when there's actually something to show in it, instead of leaving
+ * a blank box (mirrors the DEVICE_CLASS split: DESKTOP/MOBILE must be
+ * queried separately since a slot can have ads for one but not the other).
  */
-export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSlotProps) {
+export async function getActiveAd(
+  position: AdPositionValue,
+  device: AdDeviceValue = 'BOTH'
+): Promise<(Ad & { slot: AdSlotModel }) | null> {
   const now = new Date()
   const ads = await db.ad.findMany({
     where: {
@@ -33,8 +53,18 @@ export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSl
     orderBy: { createdAt: 'desc' },
     take: 1,
   })
+  return ads[0] ?? null
+}
 
-  const ad = ads[0]
+/**
+ * Server component - queries active ads directly (no extra round-trip via
+ * the public /api/ads/active endpoint, that one exists for client-side
+ * fetches if a page ever needs to refresh ads without a full reload).
+ * Renders nothing if there's no active ad for this slot/device, so it never
+ * leaves an empty gap.
+ */
+export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSlotProps) {
+  const ad = await getActiveAd(position, device)
   if (!ad) return null
 
   const media =
@@ -61,7 +91,7 @@ export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSl
     )
 
   return (
-    <div className={`${DEVICE_CLASS[device]} ${className} flex justify-center items-center overflow-hidden`}>
+    <div className={`${DEVICE_CLASS[device]} ${className} justify-center items-center overflow-hidden`}>
       <span className="sr-only">Iklan: {ad.advertiserName}</span>
       {ad.linkUrl ? (
         <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer sponsored">

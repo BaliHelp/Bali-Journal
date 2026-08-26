@@ -128,6 +128,22 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items)
 
+// Every position a slot can render at, with a human label + suggested IAB-ish
+// size so admin can tell at a glance which box on the site it maps to
+// (matches the boxes/labels on the homepage hero and article page rails).
+const AD_POSITIONS: { value: string; label: string; width: number; height: number }[] = [
+  { value: 'HEADER', label: 'Header (atas, di bawah menu)', width: 728, height: 90 },
+  { value: 'HOME_HERO_LEFT', label: 'Beranda - Rail Kiri Hero', width: 160, height: 600 },
+  { value: 'HOME_HERO_MINI', label: 'Beranda - Mini Box (bawah rail kiri)', width: 160, height: 160 },
+  { value: 'HOME_HERO_BELOW', label: 'Beranda - Banner Bawah Hero', width: 800, height: 150 },
+  { value: 'ARTICLE_LEFT', label: 'Artikel - Rail Kiri', width: 160, height: 600 },
+  { value: 'ARTICLE_RIGHT_TOP', label: 'Artikel - Rail Kanan Atas', width: 300, height: 250 },
+  { value: 'ARTICLE_RIGHT_BOTTOM', label: 'Artikel - Rail Kanan Bawah', width: 300, height: 600 },
+  { value: 'IN_ARTICLE', label: 'Dalam Artikel (antar paragraf)', width: 336, height: 280 },
+  { value: 'MOBILE_BANNER', label: 'Mobile Banner', width: 320, height: 50 },
+  { value: 'FOOTER', label: 'Footer (bawah halaman)', width: 728, height: 90 },
+]
+
 const categories = [
   { value: 'TOURISM', label: 'Pariwisata' },
   { value: 'GOVERNMENT', label: 'Pemerintah' },
@@ -1670,11 +1686,24 @@ export default function MasterAdminDashboard() {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Posisi</Label>
-                              <Select value={adSlotForm.position} onValueChange={(v) => setAdSlotForm({ ...adSlotForm, position: v })}>
+                              <Select
+                                value={adSlotForm.position}
+                                onValueChange={(v) => {
+                                  const preset = AD_POSITIONS.find((p) => p.value === v)
+                                  setAdSlotForm({
+                                    ...adSlotForm,
+                                    position: v,
+                                    width: preset?.width ?? adSlotForm.width,
+                                    height: preset?.height ?? adSlotForm.height,
+                                  })
+                                }}
+                              >
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  {['HEADER', 'SIDEBAR', 'IN_ARTICLE', 'FOOTER', 'MOBILE_BANNER'].map((p) => (
-                                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                                  {AD_POSITIONS.map((p) => (
+                                    <SelectItem key={p.value} value={p.value}>
+                                      {p.label} ({p.width}x{p.height})
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -1748,7 +1777,9 @@ export default function MasterAdminDashboard() {
                       {adSlots.map((s) => (
                         <TableRow key={s.id}>
                           <TableCell className="font-medium">{s.name}</TableCell>
-                          <TableCell><Badge variant="secondary">{s.position}</Badge></TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{AD_POSITIONS.find((p) => p.value === s.position)?.label ?? s.position}</Badge>
+                          </TableCell>
                           <TableCell>{s.device}</TableCell>
                           <TableCell>{s.width}x{s.height}</TableCell>
                           <TableCell>

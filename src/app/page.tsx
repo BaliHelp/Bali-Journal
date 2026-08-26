@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Clock, TrendingUp, AlertTriangle, Shield, FileText } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { AdSlot, getActiveAd } from '@/components/ads/ad-slot'
 
 export const revalidate = 60 // ISR: 60 seconds
 
@@ -66,7 +67,9 @@ export default async function HomePage() {
     localArticles,
     jobsArticles,
     opinionArticles,
-    totalPublished
+    totalPublished,
+    heroLeftAd,
+    heroMiniAd,
   ] = await Promise.all([
     getLatestArticles(),
     getFeaturedArticle(),
@@ -77,16 +80,31 @@ export default async function HomePage() {
     getArticlesByCategory('JOBS'),
     getArticlesByCategory('OPINION'),
     getPublishedCount(),
+    getActiveAd('HOME_HERO_LEFT', 'DESKTOP'),
+    getActiveAd('HOME_HERO_MINI', 'DESKTOP'),
   ])
+
+  // The ad rail column only reserves its grid space when there's actually
+  // something to show - otherwise the hero falls back to today's layout
+  // instead of leaving an empty box.
+  const showHeroAdRail = !!heroLeftAd || !!heroMiniAd
 
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-muted/50 to-background">
         <div className="container mx-auto max-w-7xl px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Ad rail - only takes up space when there's actually an ad to show */}
+            {showHeroAdRail && (
+              <div className="hidden lg:flex lg:flex-col gap-6 w-[160px] shrink-0">
+                <AdSlot position="HOME_HERO_LEFT" device="DESKTOP" className="w-full flex-1" />
+                <AdSlot position="HOME_HERO_MINI" device="DESKTOP" className="w-full" />
+              </div>
+            )}
+
             {/* Featured Article */}
-            <div className="lg:col-span-2">
+            <div className="flex-1 min-w-0 flex flex-col gap-6">
               {featuredArticle ? (
                 <Link href={`/article/${featuredArticle.slug}`} className="group block">
                   <div className="relative aspect-[16/9] overflow-hidden rounded-lg bg-muted shadow-lg">
@@ -135,10 +153,11 @@ export default async function HomePage() {
                   <p className="text-muted-foreground">No articles yet</p>
                 </div>
               )}
+              <AdSlot position="HOME_HERO_BELOW" device="DESKTOP" className="w-full" />
             </div>
 
             {/* Sidebar - Latest News (Scrollable) */}
-            <div className="flex flex-col h-full bg-background/50 rounded-lg border p-4">
+            <div className="lg:w-[380px] shrink-0 flex flex-col h-full bg-background/50 rounded-lg border p-4">
               <div className="flex items-center justify-between mb-4 sticky top-0 bg-background/50 backdrop-blur-sm py-2 z-10 border-b">
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-primary" />

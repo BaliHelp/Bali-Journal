@@ -20,7 +20,7 @@ import { CommentSection } from '@/components/article/comment-section'
 import { EvidenceList } from '@/components/article/evidence-list'
 import { ArticleCard } from '@/components/article/article-card'
 import { ArticleActions } from '@/components/article/article-actions'
-import { AdSlot } from '@/components/ads/ad-slot'
+import { AdSlot, getActiveAd } from '@/components/ads/ad-slot'
 import type { Category } from '@prisma/client'
 
 interface ArticlePageProps {
@@ -137,13 +137,27 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   await incrementViewCount(article.id)
 
   const otherCategoryArticles = await getOtherCategoryArticles(article.id, article.category)
+  const [leftAd, rightTopAd, rightBottomAd] = await Promise.all([
+    getActiveAd('ARTICLE_LEFT', 'DESKTOP'),
+    getActiveAd('ARTICLE_RIGHT_TOP', 'DESKTOP'),
+    getActiveAd('ARTICLE_RIGHT_BOTTOM', 'DESKTOP'),
+  ])
 
   return (
     <>
       <ArticleJsonLd article={article} />
 
       <article className="py-8">
-        <div className="container mx-auto max-w-4xl px-4">
+        <div className="container mx-auto max-w-7xl px-4">
+        <div className="flex gap-6 justify-center">
+        {/* Left ad rail - only reserved when there's actually an ad to show */}
+        {leftAd && (
+          <div className="hidden lg:block w-[160px] shrink-0 sticky top-24 self-start">
+            <AdSlot position="ARTICLE_LEFT" device="DESKTOP" className="w-full" />
+          </div>
+        )}
+
+        <div className="max-w-4xl w-full min-w-0">
           {/* Breadcrumb */}
           <nav className="mb-6 text-sm text-muted-foreground">
             <Link href="/" className="hover:text-foreground">Beranda</Link>
@@ -306,6 +320,16 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               comments={article.comments}
             />
           </div>
+        </div>
+
+        {/* Right ad rail - 2 stacked slots, only reserved when at least one has an ad */}
+        {(rightTopAd || rightBottomAd) && (
+          <div className="hidden lg:flex lg:flex-col gap-6 w-[300px] shrink-0 sticky top-24 self-start">
+            <AdSlot position="ARTICLE_RIGHT_TOP" device="DESKTOP" className="w-full" />
+            <AdSlot position="ARTICLE_RIGHT_BOTTOM" device="DESKTOP" className="w-full" />
+          </div>
+        )}
+        </div>
         </div>
       </article>
     </>
