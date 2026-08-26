@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -16,6 +16,7 @@ enum Role {
   ADMIN
   EDITOR
   USER
+  ADVERTISER
 }
 
 // Article Categories
@@ -63,55 +64,56 @@ enum CommentStatus {
 
 // Users Model
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  password     String?
-  name         String?
-  role         Role      @default(USER)
-  avatar       String?
-  bio          String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  comments     Comment[]
-  articles     Article[]
-  subscribers  Subscriber[]
-  sessions     Session[]
-  
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String?
+  name        String?
+  role        Role         @default(USER)
+  avatar      String?
+  bio         String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  comments    Comment[]
+  articles    Article[]
+  subscribers Subscriber[]
+  sessions    Session[]
+  advertiser  Advertiser?
+
   @@map("users")
 }
 
 // Articles Model
 model Article {
-  id                  String      @id @default(uuid())
+  id                  String          @id @default(uuid())
   title               String
-  slug                String      @unique
+  slug                String          @unique
   excerpt             String
   content             String
   category            Category
   featuredImageUrl    String?
   featuredImageAlt    String?
   imageSource         String?
-  sourceUrl           String?     // External source URL for rewritten articles
-  aiAssisted          Boolean     @default(false)
-  riskLevel           RiskLevel   @default(LOW)
-  riskScore           Int         @default(0)
-  containsAccusation  Boolean     @default(false)
-  verificationLevel   Verification @default(LOW)
-  evidenceCount       Int         @default(0)
-  legalReviewRequired Boolean     @default(false)
+  sourceUrl           String? // External source URL for rewritten articles
+  aiAssisted          Boolean         @default(false)
+  riskLevel           RiskLevel       @default(LOW)
+  riskScore           Int             @default(0)
+  containsAccusation  Boolean         @default(false)
+  verificationLevel   Verification    @default(LOW)
+  evidenceCount       Int             @default(0)
+  legalReviewRequired Boolean         @default(false)
   legalReviewedBy     String?
   legalReviewedAt     DateTime?
-  status              Status      @default(DRAFT)
-  viewCount           Int         @default(0)
+  status              Status          @default(DRAFT)
+  viewCount           Int             @default(0)
   authorId            String
-  author              User        @relation(fields: [authorId], references: [id])
+  author              User            @relation(fields: [authorId], references: [id])
   evidences           Evidence[]
   comments            Comment[]
   aiActivityLogs      AiActivityLog[]
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
   publishedAt         DateTime?
-  
+
   @@index([category])
   @@index([status])
   @@index([publishedAt])
@@ -120,34 +122,34 @@ model Article {
 
 // Evidence Model
 model Evidence {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   articleId   String
-  article     Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   fileUrl     String
-  type        String    // document, image, video, audio
+  type        String // document, image, video, audio
   source      String
   description String?
-  verified    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
   @@map("evidences")
 }
 
 // Comments Model (Account Required)
 model Comment {
-  id              String        @id @default(uuid())
-  content         String
-  articleId       String
-  article         Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User          @relation(fields: [userId], references: [id])
-  parentId        String?
-  status          CommentStatus @default(PENDING)
-  toxicityScore   Float?
-  legalRiskScore  Float?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
+  id             String        @id @default(uuid())
+  content        String
+  articleId      String
+  article        Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  parentId       String?
+  status         CommentStatus @default(PENDING)
+  toxicityScore  Float?
+  legalRiskScore Float?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
   @@index([articleId])
   @@index([userId])
   @@index([status])
@@ -163,7 +165,7 @@ model Subscriber {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
-  
+
   @@map("subscribers")
 }
 
@@ -174,39 +176,39 @@ model AuditLog {
   entity    String
   entityId  String
   userId    String?
-  metadata  String?  // JSON string
+  metadata  String? // JSON string
   createdAt DateTime @default(now())
-  
+
   @@index([entity, entityId])
   @@map("audit_logs")
 }
 
 // AI Settings for automation control
 model AiSettings {
-  id              String    @id @default(cuid())
-  autoPublish     Boolean   @default(false)
-  dailyLimit      Int       @default(3)
-  lastGeneration  DateTime?
-  agentStatus     Json?     // Real-time status of each agent { "AUDY": "...", "AS": "..." }
-  agentActivity   String?   // Current activity description e.g. "Thinking", "Writing"
-  healthStatus    Json?     // API connection status { "openai": "ok", "db": "ok" }
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  autoPublish    Boolean   @default(false)
+  dailyLimit     Int       @default(3)
+  lastGeneration DateTime?
+  agentStatus    Json? // Real-time status of each agent { "AUDY": "...", "AS": "..." }
+  agentActivity  String? // Current activity description e.g. "Thinking", "Writing"
+  healthStatus   Json? // API connection status { "openai": "ok", "db": "ok" }
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@map("ai_settings")
 }
 
 // AI Activity Log for monitoring
 model AiActivityLog {
-  id            String   @id @default(cuid())
-  action        String   // "generate", "rewrite", "analyze"
-  category      Category?
-  sourceUrl     String?  // For rewrites
-  articleId     String?
-  article       Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
-  success       Boolean  @default(true)
-  metadata      Json?    // Store AI thoughts, decisions, etc.
-  createdAt     DateTime @default(now())
+  id        String    @id @default(cuid())
+  action    String // "generate", "rewrite", "analyze"
+  category  Category?
+  sourceUrl String? // For rewrites
+  articleId String?
+  article   Article?  @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  success   Boolean   @default(true)
+  metadata  Json? // Store AI thoughts, decisions, etc.
+  createdAt DateTime  @default(now())
 
   @@index([createdAt])
   @@map("ai_activity_logs")
@@ -214,14 +216,14 @@ model AiActivityLog {
 
 // Sessions for Auth
 model Session {
-  id           String   @id @default(uuid())
-  userId       String
-  token        String   @unique
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-  
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("sessions")
 }
 
@@ -232,7 +234,7 @@ model Report {
   category      String
   content       String
   sourceContact String?
-  evidenceLinks String?  // JSON string or comma-separated
+  evidenceLinks String? // JSON string or comma-separated
   status        String   @default("PENDING") // PENDING, REVIEWED, ARCHIVED
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -243,8 +245,8 @@ model Report {
 // Editable Schedule Configuration
 model ScheduleConfig {
   id        String   @id @default(cuid())
-  time      String   // e.g. "06:00"
-  label     String   // e.g. "Hot News"
+  time      String // e.g. "06:00"
+  label     String // e.g. "Hot News"
   slots     Int      @default(1)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -258,13 +260,13 @@ model ScheduleConfig {
 // `embedding` is written/read via raw SQL ($queryRaw/$executeRaw) since
 // Prisma Client doesn't support the `vector` type through its normal API.
 model AgentMemory {
-  id        String                 @id @default(uuid())
-  agentKey  String                 // WIE, AUDY, AS, WUE
-  category  String?                // e.g. "legal-risk-decision", "moderation-precedent", "editorial-style"
+  id        String                      @id @default(uuid())
+  agentKey  String // WIE, AUDY, AS, WUE
+  category  String? // e.g. "legal-risk-decision", "moderation-precedent", "editorial-style"
   content   String
   embedding Unsupported("vector(384)")?
   metadata  Json?
-  createdAt DateTime               @default(now())
+  createdAt DateTime                    @default(now())
 
   @@index([agentKey])
   @@index([category])
@@ -296,14 +298,15 @@ enum AdMediaType {
 }
 
 model AdSlot {
-  id        String     @id @default(uuid())
-  name      String
-  position  AdPosition
-  device    AdDevice
-  width     Int
-  height    Int
-  ads       Ad[]
-  createdAt DateTime   @default(now())
+  id          String     @id @default(uuid())
+  name        String
+  position    AdPosition
+  device      AdDevice
+  width       Int
+  height      Int
+  pricePerDay Int?
+  ads         Ad[]
+  createdAt   DateTime   @default(now())
 
   @@map("ad_slots")
 }
@@ -320,9 +323,73 @@ model Ad {
   endDate        DateTime
   isActive       Boolean     @default(true)
   createdAt      DateTime    @default(now())
+  advertiserId   String?
+  advertiser     Advertiser? @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+  invoice        Invoice?
 
   @@index([slotId])
+  @@index([advertiserId])
   @@map("ads")
+}
+
+enum AdvertiserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Advertiser {
+  id              String           @id @default(uuid())
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName     String
+  phone           String
+  status          AdvertiserStatus @default(PENDING)
+  rejectionReason String?
+  ads             Ad[]
+  invoices        Invoice[]
+  createdAt       DateTime         @default(now())
+
+  @@map("advertisers")
+}
+
+enum InvoiceStatus {
+  UNPAID
+  VERIFYING
+  PAID
+  REJECTED
+}
+
+model Invoice {
+  id              String        @id @default(uuid())
+  invoiceNumber   String        @unique
+  advertiserId    String
+  advertiser      Advertiser    @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+  adId            String        @unique
+  ad              Ad            @relation(fields: [adId], references: [id], onDelete: Cascade)
+  amount          Int
+  status          InvoiceStatus @default(UNPAID)
+  proofUrl        String?
+  rejectionReason String?
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([advertiserId])
+  @@map("invoices")
+}
+
+model CompanySettings {
+  id              String   @id @default(uuid())
+  companyName     String?
+  address         String?
+  npwp            String?
+  phone           String?
+  bankName        String?
+  bankAccountNo   String?
+  bankAccountName String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("company_settings")
 }
 
 // Contact Form Submissions

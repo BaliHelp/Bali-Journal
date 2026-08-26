@@ -72,7 +72,9 @@ import {
   RefreshCw,
   List,
   Megaphone,
-  Upload
+  Upload,
+  Users2,
+  Receipt
 } from 'lucide-react'
 import Image from 'next/image'
 import { AiControls } from '@/components/admin/ai-controls'
@@ -109,7 +111,11 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Monetisasi',
-    items: [{ value: 'ads', label: 'Ads', icon: Megaphone }],
+    items: [
+      { value: 'ads', label: 'Ads', icon: Megaphone },
+      { value: 'advertisers', label: 'Advertisers', icon: Users2 },
+      { value: 'invoices', label: 'Invoices', icon: Receipt },
+    ],
   },
   {
     label: 'Sistem',
@@ -162,7 +168,38 @@ interface AdSlotRow {
   device: string
   width: number
   height: number
+  pricePerDay: number | null
   ads: { id: string; isActive: boolean }[]
+}
+
+interface AdvertiserRow {
+  id: string
+  companyName: string
+  phone: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  rejectionReason: string | null
+  user: { email: string; name: string | null }
+}
+
+interface InvoiceRow {
+  id: string
+  invoiceNumber: string
+  amount: number
+  status: 'UNPAID' | 'VERIFYING' | 'PAID' | 'REJECTED'
+  proofUrl: string | null
+  rejectionReason: string | null
+  advertiser: { companyName: string; user: { email: string } }
+  ad: { slot: { name: string } }
+}
+
+interface CompanySettingsData {
+  companyName: string
+  address: string
+  npwp: string
+  phone: string
+  bankName: string
+  bankAccountNo: string
+  bankAccountName: string
 }
 
 interface AdRow {
@@ -286,7 +323,7 @@ export default function MasterAdminDashboard() {
   const [ads, setAds] = useState<AdRow[]>([])
   const [showAdSlotDialog, setShowAdSlotDialog] = useState(false)
   const [showAdDialog, setShowAdDialog] = useState(false)
-  const [adSlotForm, setAdSlotForm] = useState({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90 })
+  const [adSlotForm, setAdSlotForm] = useState({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90, pricePerDay: '' })
   const [adForm, setAdForm] = useState({ slotId: '', advertiserName: '', linkUrl: '', startDate: '', endDate: '' })
   const [adFile, setAdFile] = useState<File | null>(null)
   const [adsLoading, setAdsLoading] = useState(false)
@@ -329,7 +366,7 @@ export default function MasterAdminDashboard() {
       if (!res.ok) throw new Error(data.error || 'Failed to create ad slot')
       setSuccess('Ad slot created!')
       setShowAdSlotDialog(false)
-      setAdSlotForm({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90 })
+      setAdSlotForm({ name: '', position: 'HEADER', device: 'DESKTOP', width: 728, height: 90, pricePerDay: '' })
       fetchAdsData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create ad slot')
@@ -399,6 +436,170 @@ export default function MasterAdminDashboard() {
       fetchAdsData()
     } catch {
       setError('Failed to delete ad')
+    }
+  }
+
+  // Advertisers panel state
+  const [advertisers, setAdvertisers] = useState<AdvertiserRow[]>([])
+  const [advertisersLoading, setAdvertisersLoading] = useState(false)
+
+  async function fetchAdvertisers() {
+    setAdvertisersLoading(true)
+    try {
+      const res = await fetch('/api/admin/advertisers')
+      const data = await res.json()
+      if (Array.isArray(data.advertisers)) setAdvertisers(data.advertisers)
+    } catch (err) {
+      console.error('Error fetching advertisers:', err)
+    } finally {
+      setAdvertisersLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'advertisers' && advertisers.length === 0) {
+      fetchAdvertisers()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  async function handleApproveAdvertiser(id: string) {
+    try {
+      const res = await fetch(`/api/admin/advertisers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'APPROVED' }),
+      })
+      if (!res.ok) throw new Error('Failed to approve advertiser')
+      setSuccess('Advertiser approved!')
+      fetchAdvertisers()
+    } catch {
+      setError('Failed to approve advertiser')
+    }
+  }
+
+  async function handleRejectAdvertiser(id: string) {
+    const reason = prompt('Alasan penolakan (opsional):') || undefined
+    try {
+      const res = await fetch(`/api/admin/advertisers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'REJECTED', rejectionReason: reason }),
+      })
+      if (!res.ok) throw new Error('Failed to reject advertiser')
+      setSuccess('Advertiser rejected')
+      fetchAdvertisers()
+    } catch {
+      setError('Failed to reject advertiser')
+    }
+  }
+
+  // Invoices panel state
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([])
+  const [invoicesLoading, setInvoicesLoading] = useState(false)
+
+  async function fetchInvoices() {
+    setInvoicesLoading(true)
+    try {
+      const res = await fetch('/api/admin/invoices')
+      const data = await res.json()
+      if (Array.isArray(data.invoices)) setInvoices(data.invoices)
+    } catch (err) {
+      console.error('Error fetching invoices:', err)
+    } finally {
+      setInvoicesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'invoices' && invoices.length === 0) {
+      fetchInvoices()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  async function handleVerifyInvoicePaid(id: string) {
+    if (!confirm('Konfirmasi: tandai invoice ini LUNAS? Iklan akan langsung aktif tayang.')) return
+    try {
+      const res = await fetch(`/api/admin/invoices/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'PAID' }),
+      })
+      if (!res.ok) throw new Error('Failed to verify invoice')
+      setSuccess('Invoice diverifikasi lunas, iklan aktif!')
+      fetchInvoices()
+    } catch {
+      setError('Failed to verify invoice')
+    }
+  }
+
+  async function handleRejectInvoice(id: string) {
+    const reason = prompt('Alasan penolakan bukti transfer (opsional):') || undefined
+    try {
+      const res = await fetch(`/api/admin/invoices/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'REJECTED', rejectionReason: reason }),
+      })
+      if (!res.ok) throw new Error('Failed to reject invoice')
+      setSuccess('Invoice rejected')
+      fetchInvoices()
+    } catch {
+      setError('Failed to reject invoice')
+    }
+  }
+
+  // Company settings state (used in Settings tab)
+  const [companySettings, setCompanySettings] = useState<CompanySettingsData>({
+    companyName: '', address: '', npwp: '', phone: '', bankName: '', bankAccountNo: '', bankAccountName: '',
+  })
+  const [companySettingsLoaded, setCompanySettingsLoaded] = useState(false)
+  const [savingCompanySettings, setSavingCompanySettings] = useState(false)
+
+  async function fetchCompanySettings() {
+    try {
+      const res = await fetch('/api/admin/company-settings')
+      const data = await res.json()
+      if (data.settings) {
+        setCompanySettings({
+          companyName: data.settings.companyName || '',
+          address: data.settings.address || '',
+          npwp: data.settings.npwp || '',
+          phone: data.settings.phone || '',
+          bankName: data.settings.bankName || '',
+          bankAccountNo: data.settings.bankAccountNo || '',
+          bankAccountName: data.settings.bankAccountName || '',
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching company settings:', err)
+    } finally {
+      setCompanySettingsLoaded(true)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'settings' && !companySettingsLoaded) {
+      fetchCompanySettings()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  async function handleSaveCompanySettings() {
+    setSavingCompanySettings(true)
+    try {
+      const res = await fetch('/api/admin/company-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(companySettings),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      setSuccess('Company settings saved!')
+    } catch {
+      setError('Failed to save company settings')
+    } finally {
+      setSavingCompanySettings(false)
     }
   }
 
@@ -1499,6 +1700,15 @@ export default function MasterAdminDashboard() {
                               />
                             </div>
                           </div>
+                          <div className="space-y-2">
+                            <Label>Harga per Hari (Rp) - opsional</Label>
+                            <Input
+                              type="number"
+                              placeholder="Kosongkan jika slot ini khusus admin, tidak dijual ke advertiser"
+                              value={adSlotForm.pricePerDay}
+                              onChange={(e) => setAdSlotForm({ ...adSlotForm, pricePerDay: e.target.value })}
+                            />
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             Standar IAB: Leaderboard 728x90, Medium Rectangle 300x250, Mobile Banner 320x50.
                           </p>
@@ -1518,6 +1728,7 @@ export default function MasterAdminDashboard() {
                         <TableHead>Posisi</TableHead>
                         <TableHead>Device</TableHead>
                         <TableHead>Ukuran</TableHead>
+                        <TableHead>Harga/Hari</TableHead>
                         <TableHead>Iklan Aktif</TableHead>
                         <TableHead className="text-right">Aksi</TableHead>
                       </TableRow>
@@ -1529,6 +1740,11 @@ export default function MasterAdminDashboard() {
                           <TableCell><Badge variant="secondary">{s.position}</Badge></TableCell>
                           <TableCell>{s.device}</TableCell>
                           <TableCell>{s.width}x{s.height}</TableCell>
+                          <TableCell>
+                            {s.pricePerDay != null
+                              ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(s.pricePerDay)
+                              : <span className="text-muted-foreground">Admin only</span>}
+                          </TableCell>
                           <TableCell>{s.ads.filter((a) => a.isActive).length}</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="icon" onClick={() => handleDeleteAdSlot(s.id)}>
@@ -1539,7 +1755,7 @@ export default function MasterAdminDashboard() {
                       ))}
                       {adSlots.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                             {adsLoading ? 'Loading...' : 'Belum ada ad slot. Buat satu dulu sebelum menambah iklan.'}
                           </TableCell>
                         </TableRow>
@@ -1683,6 +1899,129 @@ export default function MasterAdminDashboard() {
             </div>
           </TabsContent>
 
+          <TabsContent value="advertisers">
+            <Card>
+              <CardHeader>
+                <CardTitle>Advertisers</CardTitle>
+                <CardDescription>Tinjau & setujui pendaftaran akun pengiklan self-service</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Perusahaan</TableHead>
+                      <TableHead>Kontak</TableHead>
+                      <TableHead>Telepon</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {advertisers.map((a) => (
+                      <TableRow key={a.id}>
+                        <TableCell className="font-medium">{a.companyName}</TableCell>
+                        <TableCell className="text-xs">
+                          {a.user.name}<br /><span className="text-muted-foreground">{a.user.email}</span>
+                        </TableCell>
+                        <TableCell>{a.phone}</TableCell>
+                        <TableCell>
+                          <Badge variant={a.status === 'APPROVED' ? 'default' : a.status === 'REJECTED' ? 'destructive' : 'secondary'}>
+                            {a.status}
+                          </Badge>
+                          {a.status === 'REJECTED' && a.rejectionReason && (
+                            <p className="text-xs text-muted-foreground mt-1">{a.rejectionReason}</p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {a.status !== 'APPROVED' && (
+                            <Button size="sm" onClick={() => handleApproveAdvertiser(a.id)}>Approve</Button>
+                          )}
+                          {a.status !== 'REJECTED' && (
+                            <Button size="sm" variant="outline" onClick={() => handleRejectAdvertiser(a.id)}>Reject</Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {advertisers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          {advertisersLoading ? 'Loading...' : 'Belum ada pendaftar advertiser.'}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="invoices">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invoices</CardTitle>
+                <CardDescription>Verifikasi bukti transfer bank manual dari advertiser</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>No. Invoice</TableHead>
+                      <TableHead>Advertiser</TableHead>
+                      <TableHead>Slot</TableHead>
+                      <TableHead>Nominal</TableHead>
+                      <TableHead>Bukti</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((inv) => (
+                      <TableRow key={inv.id}>
+                        <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>
+                        <TableCell className="text-xs">
+                          {inv.advertiser.companyName}<br /><span className="text-muted-foreground">{inv.advertiser.user.email}</span>
+                        </TableCell>
+                        <TableCell>{inv.ad?.slot?.name}</TableCell>
+                        <TableCell>
+                          {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(inv.amount)}
+                        </TableCell>
+                        <TableCell>
+                          {inv.proofUrl ? (
+                            <a href={inv.proofUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline text-xs">
+                              Lihat
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={inv.status === 'PAID' ? 'default' : inv.status === 'REJECTED' ? 'destructive' : 'secondary'}>
+                            {inv.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {inv.status === 'VERIFYING' && (
+                            <>
+                              <Button size="sm" onClick={() => handleVerifyInvoicePaid(inv.id)}>Verifikasi Lunas</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleRejectInvoice(inv.id)}>Tolak</Button>
+                            </>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {invoices.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          {invoicesLoading ? 'Loading...' : 'Belum ada invoice.'}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="ai">
             <Card>
               <CardHeader>
@@ -1706,6 +2045,71 @@ export default function MasterAdminDashboard() {
 
           <TabsContent value="settings">
             <div className="grid gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Company & Bank Info (untuk Invoice)</CardTitle>
+                  <CardDescription>Data ini dipakai di invoice pengiklan & ditampilkan sebagai info rekening transfer</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Nama Perusahaan</Label>
+                      <Input
+                        value={companySettings.companyName}
+                        onChange={(e) => setCompanySettings({ ...companySettings, companyName: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>NPWP (opsional)</Label>
+                      <Input
+                        value={companySettings.npwp}
+                        onChange={(e) => setCompanySettings({ ...companySettings, npwp: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Alamat</Label>
+                      <Input
+                        value={companySettings.address}
+                        onChange={(e) => setCompanySettings({ ...companySettings, address: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Telepon</Label>
+                      <Input
+                        value={companySettings.phone}
+                        onChange={(e) => setCompanySettings({ ...companySettings, phone: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nama Bank</Label>
+                      <Input
+                        value={companySettings.bankName}
+                        onChange={(e) => setCompanySettings({ ...companySettings, bankName: e.target.value })}
+                        placeholder="BCA / Mandiri / BNI ..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nomor Rekening</Label>
+                      <Input
+                        value={companySettings.bankAccountNo}
+                        onChange={(e) => setCompanySettings({ ...companySettings, bankAccountNo: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Atas Nama Rekening</Label>
+                      <Input
+                        value={companySettings.bankAccountName}
+                        onChange={(e) => setCompanySettings({ ...companySettings, bankAccountName: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleSaveCompanySettings} disabled={savingCompanySettings}>
+                    {savingCompanySettings ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                    Simpan
+                  </Button>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Platform Settings</CardTitle>

@@ -11,6 +11,14 @@ export const registerSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter').optional(),
 })
 
+export const advertiserRegisterSchema = z.object({
+  email: z.string().email('Email tidak valid'),
+  password: z.string().min(6, 'Password minimal 6 karakter'),
+  name: z.string().min(2, 'Nama minimal 2 karakter'),
+  companyName: z.string().min(2, 'Nama perusahaan minimal 2 karakter').max(200),
+  phone: z.string().min(8, 'Nomor telepon minimal 8 digit').max(20),
+})
+
 export const articleSchema = z.object({
   title: z.string().min(10, 'Judul minimal 10 karakter').max(200, 'Judul maksimal 200 karakter'),
   excerpt: z.string().min(50, 'Ringkasan minimal 50 karakter').max(300, 'Ringkasan maksimal 300 karakter'),
@@ -41,6 +49,7 @@ export const subscriberSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
+export type AdvertiserRegisterInput = z.infer<typeof advertiserRegisterSchema>
 export type ArticleInput = z.infer<typeof articleSchema>
 export type CommentInput = z.infer<typeof commentSchema>
 export type EvidenceInput = z.infer<typeof evidenceSchema>

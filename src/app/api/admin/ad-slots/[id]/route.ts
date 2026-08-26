@@ -27,6 +27,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
                 device: body.device,
                 width: body.width !== undefined ? Number(body.width) : undefined,
                 height: body.height !== undefined ? Number(body.height) : undefined,
+                pricePerDay:
+                    body.pricePerDay === null
+                        ? null
+                        : body.pricePerDay !== undefined
+                          ? Number(body.pricePerDay)
+                          : undefined,
             },
         })
         return NextResponse.json({ slot })

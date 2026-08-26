@@ -61,3 +61,39 @@ export async function storeAdMedia(
 
     return { error: 'File must be an image, or a .webm/.mp4 video' }
 }
+
+const PROOF_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'proofs')
+const PROOF_PUBLIC_PREFIX = '/uploads/proofs'
+const MAX_PROOF_BYTES = 8 * 1024 * 1024 // 8MB
+
+/**
+ * Bank transfer proof uploads (advertiser self-service payment flow) - images
+ * get the same WebP treatment as everything else, but a PDF receipt can't go
+ * through sharp so it's stored as-is.
+ */
+export async function storeProofFile(
+    file: File,
+    label: string
+): Promise<{ url: string } | { error: string }> {
+    if (file.size > MAX_PROOF_BYTES) return { error: 'File too large (max 8MB)' }
+
+    await fs.mkdir(PROOF_UPLOAD_DIR, { recursive: true })
+    const base = safeBaseName(label)
+
+    if (file.type.startsWith('image/')) {
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const webp = await sharp(buffer).webp({ quality: WEBP_QUALITY }).toBuffer()
+        const fileName = `${base}-${randomSuffix()}.webp`
+        await fs.writeFile(path.join(PROOF_UPLOAD_DIR, fileName), webp)
+        return { url: `${PROOF_PUBLIC_PREFIX}/${fileName}` }
+    }
+
+    if (file.type === 'application/pdf') {
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const fileName = `${base}-${randomSuffix()}.pdf`
+        await fs.writeFile(path.join(PROOF_UPLOAD_DIR, fileName), buffer)
+        return { url: `${PROOF_PUBLIC_PREFIX}/${fileName}` }
+    }
+
+    return { error: 'File must be an image or a PDF' }
+}
