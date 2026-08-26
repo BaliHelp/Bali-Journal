@@ -2,7 +2,19 @@
 // Force Rebuild
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -62,6 +74,16 @@ import { AdminChatWidget } from '@/components/admin/chat-widget'
 import { AgentStatusCard } from '@/components/admin/agent-status-card'
 import { SystemHealthCard } from '@/components/admin/system-health-card'
 import { ScheduleCard } from '@/components/admin/schedule-card'
+
+const NAV_ITEMS = [
+  { value: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { value: 'articles', label: 'Articles', icon: FileText },
+  { value: 'comments', label: 'Comments', icon: MessageCircle },
+  { value: 'users', label: 'Users', icon: Users },
+  { value: 'reports', label: 'Reports', icon: BarChart3 },
+  { value: 'ai', label: 'AI Center', icon: Brain },
+  { value: 'settings', label: 'Settings', icon: Settings },
+] as const
 
 const categories = [
   { value: 'TOURISM', label: 'Pariwisata' },
@@ -492,31 +514,66 @@ export default function MasterAdminDashboard() {
     )
   })
 
+  const activeNavLabel = NAV_ITEMS.find((item) => item.value === activeTab)?.label || 'Overview'
+
   return (
-    <div className="min-h-screen bg-muted/30">
+    <SidebarProvider>
+      <Sidebar collapsible="icon">
+        <SidebarHeader>
+          <div className="flex items-center gap-2 px-2 py-1">
+            <LayoutDashboard className="h-6 w-6 text-primary shrink-0" />
+            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+              <span className="font-bold text-sm leading-tight">NewsBali Master</span>
+              <Badge variant="secondary" className="w-fit text-[10px] mt-0.5">v2.1.0</Badge>
+            </div>
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarMenu>
+            {NAV_ITEMS.map((item) => (
+              <SidebarMenuItem key={item.value}>
+                <SidebarMenuButton
+                  isActive={activeTab === item.value}
+                  onClick={() => setActiveTab(item.value)}
+                  tooltip={item.label}
+                >
+                  <item.icon />
+                  <span>{item.label}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarContent>
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="View Site">
+                <a href="/" target="_blank" rel="noopener noreferrer">
+                  <LinkIcon />
+                  <span>View Site</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
+                <LogOut />
+                <span>Logout</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+      </Sidebar>
+
+      <SidebarInset>
       {/* Header */}
       <header className="bg-background border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <LayoutDashboard className="h-6 w-6 text-primary" />
-            <span className="font-bold text-lg">NewsBali Master</span>
-            <Badge variant="secondary" className="hidden sm:flex ml-2">v2.1.0</Badge>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" asChild>
-              <a href="/" target="_blank" rel="noopener noreferrer">
-                View Site <LinkIcon className="ml-2 h-4 w-4" />
-              </a>
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" /> Logout
-            </Button>
-          </div>
+        <div className="px-4 h-16 flex items-center gap-3">
+          <SidebarTrigger />
+          <span className="font-semibold text-lg">{activeNavLabel}</span>
         </div>
       </header>
 
-      <main className="container mx-auto max-w-7xl px-4 py-6">
+      <main className="px-4 py-6 md:px-6">
         {/* Quick Stats & Alerts */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
@@ -579,15 +636,6 @@ export default function MasterAdminDashboard() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-7 h-auto">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="articles">Articles</TabsTrigger>
-            <TabsTrigger value="comments">Comments</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="ai">AI Center</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
 
           <TabsContent value="overview">
             <div className="grid gap-6">
@@ -1206,6 +1254,7 @@ export default function MasterAdminDashboard() {
       </main>
 
       <AdminChatWidget onRefresh={fetchAllData} />
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

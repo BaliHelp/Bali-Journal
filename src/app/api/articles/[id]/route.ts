@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 
 interface Params {
   params: Promise<{ id: string }>
+}
+
+async function requireEditor() {
+  const session = await getSession()
+  return session && (session.role === 'ADMIN' || session.role === 'EDITOR') ? session : null
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
@@ -21,6 +27,13 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Article not found' }, { status: 404 })
     }
 
+    // Published content is already public via the slug route - no session
+    // needed. Anything else (DRAFT/REVIEW/REJECTED) is unpublished, so only
+    // editorial staff should be able to read it by ID.
+    if (article.status !== 'PUBLISHED' && !(await requireEditor())) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     return NextResponse.json({ article })
   } catch (error) {
     console.error('Get article error:', error)
@@ -30,6 +43,10 @@ export async function GET(request: NextRequest, { params }: Params) {
 
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
+    if (!(await requireEditor())) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     const body = await request.json()
 
@@ -56,6 +73,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
+    const session = await getSession()
+    if (!session || session.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
 
     // Delete related evidences first

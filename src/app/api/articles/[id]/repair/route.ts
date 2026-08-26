@@ -2,12 +2,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { generateAndStoreImage } from '@/lib/images/image-service'
+import { getSession } from '@/lib/auth/session'
 
 export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
     try {
+        const session = await getSession()
+        if (!session || (session.role !== 'ADMIN' && session.role !== 'EDITOR')) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const article = await db.article.findUnique({
             where: { id: params.id }
         })

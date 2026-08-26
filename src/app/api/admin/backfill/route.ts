@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getSession } from '@/lib/auth/session'
 
 // Constants for View Counts
 const VIEWS_PHASE_1_MIN = 75
@@ -24,6 +25,11 @@ function getDaysArray(start: Date, end: Date) {
 
 export async function POST(req: NextRequest) {
     try {
+        const session = await getSession()
+        if (!session || session.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const { startDate = '2025-12-01', generate = false } = await req.json()
 
         // Safety check: Only allow if explicitly requested

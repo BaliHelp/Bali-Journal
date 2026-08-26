@@ -5,6 +5,7 @@ import { validateImageUrl } from '@/lib/ai/image-validator'
 import { generateAndStoreImage } from '@/lib/images/image-service'
 import type { AgentKey } from '@/lib/ai/myaiClient'
 import { Status } from '@prisma/client'
+import { getSession } from '@/lib/auth/session'
 
 // Force dynamic to prevent caching issues
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,11 @@ async function updateAgentStatus(agent: string, status: string, activity?: strin
 
 export async function POST(req: NextRequest) {
     try {
+        const session = await getSession()
+        if (!session || (session.role !== 'ADMIN' && session.role !== 'EDITOR')) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const { action, options } = await req.json()
         const logs: string[] = []
 

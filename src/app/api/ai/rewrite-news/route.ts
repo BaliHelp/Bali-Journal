@@ -4,9 +4,15 @@ import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
 import { generateAndStoreImage } from '@/lib/images/image-service'
 import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
+import { getSession } from '@/lib/auth/session'
 
 export async function POST(req: NextRequest) {
     try {
+        const session = await getSession()
+        if (!session || (session.role !== 'ADMIN' && session.role !== 'EDITOR')) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const { url, autoPublish } = await req.json()
 
         if (!url) {

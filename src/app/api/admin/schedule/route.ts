@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getServerSession } from 'next-auth'
+import { getSession } from '@/lib/auth/session'
+
+async function requireAdmin() {
+    const session = await getSession()
+    return session && session.role === 'ADMIN' ? session : null
+}
 
 export async function GET() {
     try {
+        if (!(await requireAdmin())) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         // Fetch configs, sorted by time
         const schedules = await db.scheduleConfig.findMany({
             orderBy: { time: 'asc' }
@@ -16,6 +25,10 @@ export async function GET() {
 
 export async function POST(req: Request) {
     try {
+        if (!(await requireAdmin())) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const body = await req.json()
         const { time, label, slots, isActive } = body
 
@@ -31,6 +44,10 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
     try {
+        if (!(await requireAdmin())) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const body = await req.json()
         const { id, time, label, slots, isActive } = body
 
@@ -47,6 +64,10 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
     try {
+        if (!(await requireAdmin())) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
 

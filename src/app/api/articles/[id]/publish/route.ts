@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { checkPublishRequirements } from '@/lib/legal'
+import { getSession } from '@/lib/auth/session'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -9,6 +10,11 @@ interface Params {
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
+    const session = await getSession()
+    if (!session || (session.role !== 'ADMIN' && session.role !== 'EDITOR')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
 
     // Check publish requirements
