@@ -98,8 +98,8 @@ export default async function HomePage() {
             {/* Ad rail - only takes up space when there's actually an ad to show */}
             {showHeroAdRail && (
               <div className="hidden lg:flex lg:flex-col gap-6 w-[160px] shrink-0">
-                <AdSlot position="HOME_HERO_LEFT" device="DESKTOP" className="w-full flex-1" />
-                <AdSlot position="HOME_HERO_MINI" device="DESKTOP" className="w-full" />
+                <AdSlot position="HOME_HERO_LEFT" device="DESKTOP" className="w-full flex-1 rounded-lg overflow-hidden" fill />
+                <AdSlot position="HOME_HERO_MINI" device="DESKTOP" className="w-full h-40 rounded-lg overflow-hidden shrink-0" fill />
               </div>
             )}
 
@@ -153,7 +153,7 @@ export default async function HomePage() {
                   <p className="text-muted-foreground">No articles yet</p>
                 </div>
               )}
-              <AdSlot position="HOME_HERO_BELOW" device="DESKTOP" className="w-full" />
+              <AdSlot position="HOME_HERO_BELOW" device="DESKTOP" className="w-full h-40 rounded-lg overflow-hidden shrink-0" fill />
             </div>
 
             {/* Sidebar - Latest News (Scrollable) */}

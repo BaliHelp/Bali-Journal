@@ -23,6 +23,8 @@ interface AdSlotProps {
   /** Which viewport this instance renders for - controls the responsive show/hide class (CSS-only, no layout shift/JS device detection). */
   device?: AdDeviceValue
   className?: string
+  /** Fill the parent container (object-cover) instead of rendering at the creative's own intrinsic size - for rails meant to match a sibling's height (e.g. the homepage hero side rail), not for fixed-format banners. */
+  fill?: boolean
 }
 
 export const DEVICE_CLASS: Record<AdDeviceValue, string> = {
@@ -61,7 +63,8 @@ export async function getActiveAds(position: AdPositionValue, device: AdDeviceVa
 }
 
 /** Renders one ad's creative (image/video) wrapped in its click-through link, if any. Shared by AdSlot (single) and AdCarousel (rotating). */
-export function AdMedia({ ad }: { ad: AdWithSlot }) {
+export function AdMedia({ ad, fill = false }: { ad: AdWithSlot; fill?: boolean }) {
+  const mediaClass = fill ? 'w-full h-full object-cover' : 'max-w-full h-auto'
   const media =
     ad.mediaType === 'VIDEO' ? (
       <video
@@ -72,7 +75,7 @@ export function AdMedia({ ad }: { ad: AdWithSlot }) {
         playsInline
         width={ad.slot.width}
         height={ad.slot.height}
-        className="max-w-full h-auto"
+        className={mediaClass}
       />
     ) : (
       // eslint-disable-next-line @next/next/no-img-element
@@ -81,7 +84,7 @@ export function AdMedia({ ad }: { ad: AdWithSlot }) {
         alt={ad.advertiserName}
         width={ad.slot.width}
         height={ad.slot.height}
-        className="max-w-full h-auto"
+        className={mediaClass}
       />
     )
 
@@ -89,7 +92,7 @@ export function AdMedia({ ad }: { ad: AdWithSlot }) {
     <>
       <span className="sr-only">Iklan: {ad.advertiserName}</span>
       {ad.linkUrl ? (
-        <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer sponsored">
+        <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer sponsored" className={fill ? 'block w-full h-full' : undefined}>
           {media}
         </a>
       ) : (
@@ -106,13 +109,13 @@ export function AdMedia({ ad }: { ad: AdWithSlot }) {
  * Renders nothing if there's no active ad for this slot/device, so it never
  * leaves an empty gap.
  */
-export async function AdSlot({ position, device = 'BOTH', className = '' }: AdSlotProps) {
+export async function AdSlot({ position, device = 'BOTH', className = '', fill = false }: AdSlotProps) {
   const ad = await getActiveAd(position, device)
   if (!ad) return null
 
   return (
     <div className={`${DEVICE_CLASS[device]} ${className} justify-center items-center overflow-hidden`}>
-      <AdMedia ad={ad} />
+      <AdMedia ad={ad} fill={fill} />
     </div>
   )
 }
