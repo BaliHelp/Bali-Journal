@@ -138,10 +138,6 @@ export default function AboutPage() {
                 <p className="text-xs text-muted-foreground">Editorial Neutrality</p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Articles that use AI assistance will be marked with an "AI-Assisted" label 
-              for full transparency to readers.
-            </p>
           </CardContent>
         </Card>
 

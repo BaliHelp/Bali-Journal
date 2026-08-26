@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { generateAndStoreImage } from '@/lib/images/image-service'
+import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
 
 export async function POST(request: Request) {
     try {
@@ -21,14 +23,16 @@ export async function POST(request: Request) {
             {
                 role: "system",
                 content: `You are a senior editor at NewsBali. You are given raw data, notes, or a press release.
-                Your task is to transform this into a professional, journalistic news article adhering to the 5W1H standard (Who, What, Where, When, Why, How).
+                Your task is to transform this into a professional, journalistic news article, using the 5W1H standard (Who, What, Where, When, Why, How) as your internal outline only.
+
+                ${NEWS_STYLE_RULES}
 
                 The output must be a valid JSON object with the following structure:
                 {
                     "title": "A captivating, journalistic headline",
                     "slug": "kebab-case-slug-optimized-for-seo",
                     "excerpt": "A concise summary (max 160 chars)",
-                    "content": "The full article content in HTML format. Use <h2>, <p>, <ul>, <li>. Do not use <h1>. Ensure 5W1H are covered early in the text.",
+                    "content": "The full article content in HTML format. Use <p>, <h3> (sparingly), <ul>, <li>. Do not use <h1> or <h2>.",
                     "category": "One of: TOURISM, INVESTMENT, INCIDENTS, LOCAL, JOBS, OPINION",
                     "riskLevel": "LOW",
                     "fiveWOneH": {
@@ -54,8 +58,11 @@ export async function POST(request: Request) {
             throw new Error('AI response did not include a title/slug - the model deviated from the requested JSON schema. Try again.')
         }
 
-        // 2. Generate Image
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(result.title + ' Bali news realistic')}?width=1200&height=800&nologo=true`
+        // 2. Generate Image (verified binary, stored locally — stable URL forever)
+        const storedImage = await generateAndStoreImage(result.title, undefined, {
+            category: result.category,
+            excerpt: result.excerpt,
+        })
 
         // 3. Create Article
         const article = await db.article.create({
@@ -65,9 +72,9 @@ export async function POST(request: Request) {
                 excerpt: result.excerpt,
                 content: result.content, // HTML content
                 category: result.category,
-                featuredImageUrl: imageUrl,
+                featuredImageUrl: storedImage.localPath,
                 featuredImageAlt: result.title,
-                imageSource: 'AI Generated',
+                imageSource: storedImage.source,
                 aiAssisted: true,
                 riskLevel: 'LOW', // Default, assuming editor checks
                 status: autoPublish ? 'PUBLISHED' : 'DRAFT',

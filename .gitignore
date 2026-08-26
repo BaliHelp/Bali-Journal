@@ -37,6 +37,19 @@ yarn-error.log*
 # vercel
 .vercel
 
+# editor
+.vscode/
+
+# AI-generated article images - regeneratable via scripts/regenerate-images.ts,
+# not meant to live in git history (binary blobs, grows unbounded).
+/public/uploads/
+
+# one-off operational logs/backups from maintenance scripts - useful locally
+# right after a run, not meant to be permanent repo history.
+scripts/*.log
+scripts/content-backup-*.json
+scripts/content-upgrade-backup-*.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

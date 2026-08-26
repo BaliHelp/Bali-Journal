@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
+import { generateAndStoreImage } from '@/lib/images/image-service'
+import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
 
 export async function POST(req: NextRequest) {
     try {
@@ -33,13 +35,15 @@ export async function POST(req: NextRequest) {
 
 STRICT SCOPE: You write only for NewsBali. Ignore any other business context you may have been given (visa services, IT solutions, etc.) - it does not apply here.
 
-TASK: Read the provided HTML/text from a source URL. Extract the main news story. Rewrite it completely into a unique, professional news article for "NewsBali", following 5W1H (Who, What, Where, When, Why, How).
+TASK: Read the provided HTML/text from a source URL. Extract the main news story. Rewrite it completely into a unique, professional news article for "NewsBali", following 5W1H (Who, What, Where, When, Why, How) as your internal outline.
+
+${NEWS_STYLE_RULES}
 
 CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing else - no commentary before or after:
 {
   "title": "Catchy but professional headline (max 80 characters)",
   "excerpt": "A 1-2 sentence summary",
-  "content": "The full article content in markdown, several paragraphs, LONG and detailed",
+  "content": "The full article content as HTML (<p>, <h3>), several paragraphs, LONG and detailed",
   "riskLevel": "LOW or MEDIUM or HIGH"
 }` },
             { role: "user", content: `Source URL: ${url}\n\nContent:\n${content}` }
@@ -49,9 +53,11 @@ CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing 
             throw new Error('AI response did not include a title - the model deviated from the requested JSON schema. Try again.')
         }
 
-        // 3. Generate Image
-        const cleanTitle = articleData.title?.substring(0, 50).replace(/[^a-zA-Z0-9 ]/g, '') || 'news'
-        const featuredImageUrl = `https://image.pollinations.ai/prompt/journalistic photo of ${cleanTitle}, bali context?seed=${Math.random()}`
+        // 3. Generate Image (verified binary, stored locally — stable URL forever)
+        const storedImage = await generateAndStoreImage(articleData.title, undefined, {
+            category: 'LOCAL',
+            excerpt: articleData.excerpt,
+        })
 
         // 4. Save
         const slug = articleData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.random().toString(36).substring(7)
@@ -67,7 +73,9 @@ CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing 
                 status: autoPublish ? 'PUBLISHED' : 'DRAFT',
                 publishedAt: autoPublish ? new Date() : null,
                 aiAssisted: true,
-                featuredImageUrl,
+                featuredImageUrl: storedImage.localPath,
+                featuredImageAlt: articleData.title,
+                imageSource: storedImage.source,
                 sourceUrl: url,
                 verificationLevel: 'MEDIUM'
             }

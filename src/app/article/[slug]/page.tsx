@@ -3,14 +3,11 @@ import { notFound } from 'next/navigation'
 
 import Image from 'next/image'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
   User,
   Clock,
   Eye,
-  Share2,
-  Bookmark,
   FileText,
   Shield,
   AlertTriangle,
@@ -21,6 +18,9 @@ import Link from 'next/link'
 import { ArticleJsonLd } from '@/components/seo/article-json-ld'
 import { CommentSection } from '@/components/article/comment-section'
 import { EvidenceList } from '@/components/article/evidence-list'
+import { ArticleCard } from '@/components/article/article-card'
+import { ArticleActions } from '@/components/article/article-actions'
+import type { Category } from '@prisma/client'
 
 interface ArticlePageProps {
   params: Promise<{ slug: string }>
@@ -51,8 +51,37 @@ async function incrementViewCount(articleId: string) {
   })
 }
 
+const ALL_CATEGORIES: Category[] = ['TOURISM', 'GOVERNMENT', 'INVESTMENT', 'INCIDENTS', 'LOCAL', 'JOBS', 'OPINION']
+
+/**
+ * Like real newsrooms do: below the article, one backlink per OTHER
+ * category (not just "more like this") so readers cross-navigate the whole
+ * site instead of getting stuck in one topic. Skips a category entirely if
+ * it has no published article yet, rather than showing a broken/empty card.
+ */
+async function getOtherCategoryArticles(excludeId: string, excludeCategory: Category) {
+  const otherCategories = ALL_CATEGORIES.filter((c) => c !== excludeCategory)
+
+  const results = await Promise.all(
+    otherCategories.map((category) =>
+      db.article.findFirst({
+        where: { status: 'PUBLISHED', category, id: { not: excludeId } },
+        orderBy: { publishedAt: 'desc' },
+        select: {
+          id: true, title: true, slug: true, excerpt: true, category: true,
+          featuredImageUrl: true, featuredImageAlt: true, publishedAt: true,
+          viewCount: true, aiAssisted: true, author: { select: { name: true } },
+        },
+      })
+    )
+  )
+
+  return results.filter((a): a is NonNullable<typeof a> => a !== null)
+}
+
 const categoryLabels: Record<string, string> = {
   TOURISM: 'Pariwisata',
+  GOVERNMENT: 'Pemerintahan',
   INVESTMENT: 'Investasi',
   INCIDENTS: 'Insiden',
   LOCAL: 'Lokal',
@@ -106,6 +135,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   // Increment view count
   await incrementViewCount(article.id)
 
+  const otherCategoryArticles = await getOtherCategoryArticles(article.id, article.category)
+
   return (
     <>
       <ArticleJsonLd article={article} />
@@ -132,9 +163,6 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               <Badge variant="secondary">
                 {categoryLabels[article.category]}
               </Badge>
-              {article.aiAssisted && (
-                <Badge variant="outline">AI-Assisted</Badge>
-              )}
               <Badge
                 variant="outline"
                 className="flex items-center gap-1"
@@ -243,18 +271,24 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </div>
 
           {/* Share Actions */}
-          <div className="flex flex-wrap gap-2 mb-8">
-            <Button variant="outline" size="sm">
-              <Share2 className="h-4 w-4 mr-2" />
-              Bagikan
-            </Button>
-            <Button variant="outline" size="sm">
-              <Bookmark className="h-4 w-4 mr-2" />
-              Simpan
-            </Button>
-          </div>
+          <ArticleActions slug={article.slug} title={article.title} excerpt={article.excerpt} />
 
           <Separator className="my-8" />
+
+          {/* Baca Juga - one backlink per other category, so readers cross-navigate the site */}
+          {otherCategoryArticles.length > 0 && (
+            <>
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-6">Baca Juga dari Kategori Lain</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {otherCategoryArticles.map((related) => (
+                    <ArticleCard key={related.id} article={related} />
+                  ))}
+                </div>
+              </div>
+              <Separator className="my-8" />
+            </>
+          )}
 
           {/* Comments Section */}
           <div>

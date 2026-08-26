@@ -24,6 +24,7 @@ interface ArticleCardProps {
 
 const categoryLabels: Record<string, string> = {
   TOURISM: 'Tourism',
+  GOVERNMENT: 'Government',
   INVESTMENT: 'Investment',
   INCIDENTS: 'Incidents',
   LOCAL: 'Local',
@@ -91,13 +92,6 @@ export function ArticleCard({ article, variant = 'default' }: ArticleCardProps) 
               {categoryLabels[article.category] || article.category}
             </Badge>
           </div>
-          {article.aiAssisted && (
-            <div className="absolute top-3 right-3">
-              <Badge variant="outline" className="bg-background/90 backdrop-blur-sm text-xs">
-                AI-Assisted
-              </Badge>
-            </div>
-          )}
         </div>
         <div className="flex-1 flex flex-col p-4">
           <h3 className="font-semibold line-clamp-2 mb-2 group-hover:text-primary transition-colors">

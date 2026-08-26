@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // Force Rebuild
 import { db } from '@/lib/db'
 import { validateImageUrl } from '@/lib/ai/image-validator'
+import { generateAndStoreImage } from '@/lib/images/image-service'
 import type { AgentKey } from '@/lib/ai/myaiClient'
 import { Status } from '@prisma/client'
 
@@ -106,9 +107,6 @@ export async function POST(req: NextRequest) {
             })
 
             for (const article of recentArticles) {
-                // ... (Existing Audy Logic with Retry Loop) ...
-                // Re-using the retry logic we built earlier, essentially
-
                 let attempts = 0
                 let isFixed = false
                 while (attempts < 2 && !isFixed) {
@@ -118,16 +116,25 @@ export async function POST(req: NextRequest) {
                         await updateAgentStatus('AUDY', `Fixing image for "${article.title}" (Attempt ${attempts})`, 'Repairing')
                         logs.push(`[AUDY]: Fixing image for "${article.title}"...`)
 
-                        // Repair Logic
-                        const cleanTitle = article.title.substring(0, 50).replace(/[^a-zA-Z0-9 ]/g, '')
-                        const newImage = `https://image.pollinations.ai/prompt/journalistic photo of ${cleanTitle}, bali news style, 4k, realistic?seed=${Math.random()}`
-
-                        await db.article.update({
-                            where: { id: article.id },
-                            data: { featuredImageUrl: newImage }
+                        // Repair Logic: generate a fresh VERIFIED image and store it
+                        // locally under /uploads/articles — no more hotlinks.
+                        const stored = await generateAndStoreImage(article.title, undefined, {
+                            category: article.category,
+                            excerpt: article.excerpt,
                         })
-                        article.featuredImageUrl = newImage as string // update local
-                        await new Promise(r => setTimeout(r, 1500)) // wait
+
+                        if (stored.localPath) {
+                            await db.article.update({
+                                where: { id: article.id },
+                                data: {
+                                    featuredImageUrl: stored.localPath,
+                                    imageSource: stored.source
+                                }
+                            })
+                            article.featuredImageUrl = stored.localPath // update local
+                        } else {
+                            logs.push(`❌ [AUDY]: All image sources failed for "${article.title}".`)
+                        }
                     } else {
                         isFixed = true
                     }
@@ -157,41 +164,44 @@ export async function POST(req: NextRequest) {
                 // Loop to ensure quality (Max 3 attempts per pass to prevent infinite loops)
                 while (attempts < 3 && !isFixed) {
                     let currentImage = article.featuredImageUrl
-                    // If we just repaired it, we need to check the *new* url (not in DB yet if we just generated it, 
-                    // effectively we rely on the DB update from previous iteration, but here we can just check what we have)
-                    // Actually, simpler: Validate -> If Bad -> Fix -> Wait -> Continue Loop
 
                     const isValid = await validateImageUrl(currentImage || '')
 
                     if (isValid && currentImage) {
                         isFixed = true
-                        // logs.push(`✅ [AUDY VERIFIED]: "${article.title}" is good.`)
                     } else {
                         attempts++
                         logs.push(`⚠️ [AUDY FIX ATTEMPT ${attempts}]: Broken/Missing image for "${article.title}". repairing...`)
 
-                        const cleanTitle = article.title.substring(0, 50).replace(/[^a-zA-Z0-9 ]/g, '')
-                        const timestamp = new Date().getTime()
-                        const seed = Math.floor(Math.random() * 1000)
+                        // Each attempt uses a different prompt hint so retries explore
+                        // a different visual style instead of regenerating the same thing
+                        const promptHint =
+                            attempts === 2
+                                ? 'news photography, indonesia context, high quality'
+                                : attempts >= 3
+                                    ? 'editorial photo, scenic view'
+                                    : 'journalistic photo'
 
-                        // Try different prompt strategies based on attempt
-                        let prompt = `journalistic photo of ${cleanTitle}, bali news style, 4k, realistic`
-                        if (attempts === 2) prompt = `news photography, ${cleanTitle}, indonesia context, high quality`
-                        if (attempts === 3) prompt = `bali vista, ${cleanTitle}, editorial photo`
+                        const stored = await generateAndStoreImage(
+                            article.title,
+                            `${promptHint} of ${article.title.substring(0, 40)}, bali news`
+                        )
 
-                        const newImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?nologo=true&private=true&enhance=false&seed=${seed}`
+                        if (stored.localPath) {
+                            // Update DB immediately
+                            await db.article.update({
+                                where: { id: article.id },
+                                data: {
+                                    featuredImageUrl: stored.localPath,
+                                    imageSource: stored.source
+                                }
+                            })
 
-                        // Update DB immediately
-                        await db.article.update({
-                            where: { id: article.id },
-                            data: { featuredImageUrl: newImage }
-                        })
-
-                        // Update local var for next loop check
-                        article.featuredImageUrl = newImage
-
-                        // Wait 2 seconds for generation to register
-                        await new Promise(r => setTimeout(r, 2000))
+                            // Update local var for next loop check
+                            article.featuredImageUrl = stored.localPath
+                        } else {
+                            logs.push(`❌ [AUDY]: All image sources failed for "${article.title}".`)
+                        }
                     }
                 }
 
@@ -222,18 +232,26 @@ export async function POST(req: NextRequest) {
                 if (!isValid) {
                     logs.push(`🛠️ Repairing broken image for: "${article.title}"`)
 
-                    const cleanTitle = article.title.substring(0, 50).replace(/[^a-zA-Z0-9 ]/g, '')
-                    const seed = Math.floor(Math.random() * 10000)
-                    const prompt = `journalistic photo of ${cleanTitle}, bali news style, 4k, realistic, high resolution`
-
-                    const newImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?nologo=true&private=true&enhance=false&seed=${seed}`
-
-                    await db.article.update({
-                        where: { id: article.id },
-                        data: { featuredImageUrl: newImage }
+                    // Generate a fresh verified image and store it on our own server
+                    const stored = await generateAndStoreImage(article.title, undefined, {
+                        category: article.category,
+                        excerpt: article.excerpt,
                     })
-                    fixedCount++
-                    // Small delay to be nice to the API
+
+                    if (stored.localPath) {
+                        await db.article.update({
+                            where: { id: article.id },
+                            data: {
+                                featuredImageUrl: stored.localPath,
+                                imageSource: stored.source
+                            }
+                        })
+                        fixedCount++
+                    } else {
+                        logs.push(`❌ Could not generate a replacement for "${article.title}".`)
+                    }
+
+                    // Small delay to be nice to the generator APIs
                     await new Promise(r => setTimeout(r, 1000))
                 }
             }

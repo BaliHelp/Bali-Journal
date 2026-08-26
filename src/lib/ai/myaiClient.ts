@@ -29,9 +29,17 @@ export type MyaiField =
 // baked-in persona for that field (a visa/IT services assistant) that
 // bleeds into responses regardless of our system prompt. Plain 'chatbot'
 // stays neutral and follows our persona correctly.
+//
+// COST: checked GET /api/v1/models on the gateway (2026-08-25) - AUDY used
+// to run on 'reasoning_general', whose tier-1 model is Claude Sonnet 4.5
+// ($3/$15 per M tokens), by far the priciest field of the three. Moved AUDY
+// to 'chatbot' (tier-1 GPT-4o-mini, $0.15/$0.60) to match WIE/WUE/AS's
+// already-cheap-first setup. Claude still sits in 'chatbot's fallback chain
+// (tier 2) as a safety net if GPT-4o-mini errors out - it's just no longer
+// the default for every compliance check.
 export const MYAI_FIELDS = {
     WIE: 'content_journalist',
-    AUDY: 'reasoning_general',
+    AUDY: 'chatbot',
     AS: 'chatbot',
     WUE: 'content_journalist',
 } as const satisfies Record<string, MyaiField>

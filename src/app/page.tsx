@@ -109,11 +109,6 @@ export default async function HomePage() {
                         <Badge variant="secondary" className="bg-primary/90 text-primary-foreground hover:bg-primary">
                           {categoryLabels[featuredArticle.category]}
                         </Badge>
-                        {featuredArticle.aiAssisted && (
-                          <Badge variant="outline" className="bg-background/20 text-white border-white/20 backdrop-blur-sm">
-                            AI-Assisted
-                          </Badge>
-                        )}
                       </div>
                       <h1 className="text-2xl md:text-4xl font-bold text-white mb-3 line-clamp-2 leading-tight">
                         {featuredArticle.title}
@@ -355,6 +350,7 @@ export default async function HomePage() {
 
 const categoryLabels: Record<string, string> = {
   TOURISM: 'Tourism',
+  GOVERNMENT: 'Government',
   INVESTMENT: 'Investment',
   INCIDENTS: 'Incidents',
   LOCAL: 'Local',

@@ -1,7 +1,8 @@
 import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { db } from '@/lib/db'
 import { Category, RiskLevel, Verification, Status } from '@prisma/client'
-import { validateImageUrl } from '@/lib/ai/image-validator'
+import { generateAndStoreImage, insertInlineImages } from '@/lib/images/image-service'
+import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
 
 
 
@@ -49,6 +50,51 @@ function generateSlug(title: string): string {
         .substring(0, 100)
 }
 
+// ---------------------------------------------------------------------------
+// Duplicate-title prevention. Audit of the published backlog (2026-08-26)
+// found 12 near-duplicate title pairs out of 49 articles - same topic,
+// reworded headline ("Job Market Blooms" / "Blossoms" / "Expansion"), which
+// is also why their generated photos looked near-identical: same category +
+// same excerpt content -> same image prompt inputs, regardless of which
+// generator produced it. The real fix is catching this at generation time,
+// not just varying the image afterward.
+// ---------------------------------------------------------------------------
+
+const TITLE_SIMILARITY_THRESHOLD = 0.5 // jaccard word-overlap; matches the audit's flagging threshold
+const MAX_TITLE_RETRY_ATTEMPTS = 3
+
+function titleWords(title: string): Set<string> {
+    return new Set(
+        title.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 3)
+    )
+}
+
+function titleSimilarity(a: string, b: string): number {
+    const setA = titleWords(a)
+    const setB = titleWords(b)
+    const intersection = [...setA].filter((w) => setB.has(w)).length
+    const union = new Set([...setA, ...setB]).size
+    return union === 0 ? 0 : intersection / union
+}
+
+/** Existing titles in this category (published or draft) that a new article must not echo. */
+async function getExistingTitlesForCategory(category: Category): Promise<string[]> {
+    const existing = await db.article.findMany({
+        where: { category, status: { in: ['PUBLISHED', 'DRAFT'] } },
+        select: { title: true },
+        take: 200,
+        orderBy: { createdAt: 'desc' },
+    })
+    return existing.map((a) => a.title)
+}
+
+function findSimilarTitle(candidate: string, existingTitles: string[]): string | null {
+    for (const existing of existingTitles) {
+        if (titleSimilarity(candidate, existing) >= TITLE_SIMILARITY_THRESHOLD) return existing
+    }
+    return null
+}
+
 const CATEGORY_GUIDELINES = {
     TOURISM: 'tourism industry, hotels, festivals, cultural attractions, visitor experiences',
     GOVERNMENT: 'Bali provincial government policies, Governor statements, regulations, public services, key Jakarta updates affecting Bali',
@@ -59,32 +105,28 @@ const CATEGORY_GUIDELINES = {
     OPINION: 'expert commentary, cultural analysis, social issues, policy discussions',
 }
 
-async function generateArticleContent(category: Category): Promise<GeneratedArticle> {
+async function generateArticleContent(category: Category, avoidTitles: string[] = []): Promise<GeneratedArticle> {
+    const avoidBlock = avoidTitles.length
+        ? `\n\nALREADY COVERED - DO NOT repeat these topics/angles, pick something genuinely different:\n${avoidTitles.map((t) => `- "${t}"`).join('\n')}\n`
+        : ''
+
     const prompt = `You are a Senior Investigative Journalist for NewsBali, a prestigious English-language news outlet in Indonesia.
-    
+
     TASK: Write a comprehensive, high-quality news article based on REAL or HIGHLY REALISTIC CURRENT TRENDS in Bali.
-    
+
     SPECIFICATIONS:
     - Category: ${category}
     - Focus: ${CATEGORY_GUIDELINES[category]}
     - Tone: Professional, Objective, Authoritative, Journalistic (Associated Press style).
-    - Length: LONG FORM (800-1200 words equivalent via sections).
-    - Structure: MUST follow the "Inverted Pyramid" + 5W 1H format.
-    
-    STRICT STRUCTURE (5-7 SECTIONS):
-    1.  **LEAD (The Hook)**: summarises the 5W 1H (Who, What, Where, When, Why, How) in the first paragraph.
-    2.  **THE FACTS (Body)**: Detailed breakdown of the event/topic.
-    3.  **KEY QUOTES**: Include realistic quotes from officials, locals, or experts (e.g., "The Governor of Bali stated...", "Local business owner Wayan...").
-    4.  **BACKGROUND/CONTEXT**: Historical context or what led to this.
-    5.  **IMPACT**: How this affects tourism, economy, or locals.
-    6.  **OPPOSING VIEWS** (if applicable): Balance the story.
-    7.  **CONCLUSION/LOOKING AHEAD**: What happens next.
-    
+    - Length: LONG FORM (800-1200 words equivalent).
+    - Structure: Follow the "Inverted Pyramid" + 5W 1H as your INTERNAL outline only (lead paragraph covering who/what/where/when/why/how, then supporting facts, quotes, context, impact, and what happens next, in that order of importance) - see the style rules below for how this must read on the page.
+    ${avoidBlock}
+    ${NEWS_STYLE_RULES}
+
     CONTENT RULES:
     - **REALISM**: Use REAL locations (specific streets in Canggu, offices in Renon, temples, etc.). Use REAL titles of officials (e.g., Governor, Head of Tourism Board).
     - **NO FAKE NEWS**: Do not invent disasters or crimes unless generating for "INCIDENTS". Focus on factual trends (e.g., Traffic congestion in Canggu, New Visa rules, Investment boom in Uluwatu).
-    - **Formatting**: Use HTML <p> tags for paragraphs, <h3> for section headers to break up the text.
-    
+
     CRITICAL: Return ONLY a valid JSON object with this EXACT structure:
     {
       "title": "Catchy but Professional Headline (Max 80 characters)",
@@ -128,7 +170,29 @@ export async function generateNewsArticles(count: number = 3, authorId: string, 
     for (let i = 0; i < count; i++) {
         try {
             const category = selectRandomCategory()
-            const generated = await generateArticleContent(category)
+            const existingTitles = await getExistingTitlesForCategory(category)
+
+            let generated = await generateArticleContent(category, existingTitles)
+            let collision = findSimilarTitle(generated.title, existingTitles)
+            let attempts = 1
+
+            // Retry with the colliding title(s) added to the avoid-list -
+            // this is what stops the model from just picking the same
+            // recurring angle again (e.g. "boost sustainable tourism") every
+            // time this category comes up.
+            const avoidList = [...existingTitles]
+            while (collision && attempts < MAX_TITLE_RETRY_ATTEMPTS) {
+                console.warn(`Title too similar to existing "${collision}" - retrying (attempt ${attempts + 1}/${MAX_TITLE_RETRY_ATTEMPTS})`)
+                avoidList.push(generated.title)
+                generated = await generateArticleContent(category, avoidList)
+                collision = findSimilarTitle(generated.title, avoidList)
+                attempts++
+            }
+
+            if (collision) {
+                console.error(`Skipping article: could not produce a distinct title after ${MAX_TITLE_RETRY_ATTEMPTS} attempts (still similar to "${collision}")`)
+                continue
+            }
 
             // Generate unique slug
             const baseSlug = generateSlug(generated.title)
@@ -145,42 +209,35 @@ export async function generateNewsArticles(count: number = 3, authorId: string, 
             const hoursAgo = Math.floor(Math.random() * 24)
             const publishedAt = new Date(Date.now() - hoursAgo * 3600000)
 
-            // Validate Image Logic
-            // Clean title for better prompts
-            const cleanTitle = generated.title.substring(0, 60).replace(/[^a-zA-Z0-9 ]/g, '')
-            const seed = Math.floor(Math.random() * 100000)
+            // Generate, verify and STORE the image locally.
+            // The DB receives a stable "/uploads/articles/..." path — no more
+            // fragile third-party hotlinks that expire or get rate-limited.
+            const stored = await generateAndStoreImage(generated.title, undefined, {
+                category,
+                excerpt: generated.excerpt,
+            })
 
-            // Primary: Pollinations (High Quality)
-            let imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent('journalistic photo ' + cleanTitle + ', bali context, realistic, 4k')}?width=1200&height=800&nologo=true&seed=${seed}`
-            let isImageValid = await validateImageUrl(imageUrl)
-            let imageAttempts = 0
-
-            // Retry Pollinations with simpler prompt
-            while (!isImageValid && imageAttempts < 2) {
-                imageAttempts++
-                const retrySeed = Math.floor(Math.random() * 100000)
-                imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent('bali news ' + cleanTitle)}?width=1200&height=800&nologo=true&seed=${retrySeed}`
-                isImageValid = await validateImageUrl(imageUrl)
-            }
-
-            // Fallback: LoremFlickr (Reliable)
-            if (!isImageValid) {
-                const keywords = cleanTitle.split(' ').slice(0, 2).join(',')
-                imageUrl = `https://loremflickr.com/1200/800/${keywords}?lock=${seed}`
-                // Assume LoremFlickr is valid or let next validation catch it, but usually it works
-            }
+            // Additional images placed inside the article body itself (not
+            // just the one featuredImageUrl banner) - each generated from
+            // the specific paragraph it sits next to, so it actually
+            // illustrates that section rather than just repeating the
+            // headline photo further down the page.
+            const contentWithInlineImages = await insertInlineImages(
+                generated.content,
+                generated.title,
+                category
+            )
 
             const article = await db.article.create({
                 data: {
                     title: generated.title,
                     slug,
                     excerpt: generated.excerpt,
-                    content: generated.content,
+                    content: contentWithInlineImages,
                     category,
-                    // Use Pollinations AI for reliable image generation based on title
-                    featuredImageUrl: imageUrl,
+                    featuredImageUrl: stored.localPath, // null only if every source failed
                     featuredImageAlt: generated.title,
-                    imageSource: 'AI Generated',
+                    imageSource: stored.source,
                     aiAssisted: true, // Mark as AI-generated
                     riskLevel: generated.riskLevel,
                     riskScore: generated.riskLevel === 'HIGH' ? 70 : generated.riskLevel === 'MEDIUM' ? 40 : 15,

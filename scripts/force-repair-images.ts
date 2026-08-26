@@ -93,7 +93,7 @@ async function main() {
                 where: { id: article.id },
                 data: {
                     featuredImageUrl: newImage,
-                    imageSource: isPollinationsWorking ? 'AI Generated (Repaired)' : 'LoremFlickr (Fallback)'
+                    imageSource: isPollinationsWorking ? 'AI-Generated Illustration' : 'Stock Photo (LoremFlickr)'
                 }
             })
             fixedCount++
