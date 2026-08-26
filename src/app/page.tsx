@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Clock, TrendingUp, AlertTriangle, Shield, FileText } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { AdSlot, getActiveAd } from '@/components/ads/ad-slot'
+import { AdSlot, AdMedia, getActiveAd } from '@/components/ads/ad-slot'
 
 export const revalidate = 60 // ISR: 60 seconds
 
@@ -82,11 +82,6 @@ export default async function HomePage() {
     getActiveAd('HOME_HERO_LEFT', 'DESKTOP'),
   ])
 
-  // The ad rail column only reserves its grid space when there's actually
-  // something to show - otherwise the hero falls back to today's layout
-  // instead of leaving an empty box.
-  const showHeroAdRail = !!heroLeftAd
-
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -97,10 +92,17 @@ export default async function HomePage() {
                 the rail's stretched height matches ONLY this column (hero +
                 below-hero banner), not the taller Breaking News sidebar. */}
             <div className="flex-1 min-w-0 flex flex-col lg:flex-row gap-6">
-              {/* Ad rail - only takes up space when there's actually an ad to show */}
-              {showHeroAdRail && (
+              {/* Ad rail - only takes up space when there's actually an ad to show.
+                  Renders heroLeftAd (already fetched above) directly instead of
+                  going through <AdSlot>, which would re-run its own independent
+                  DB query for the same data - two separate queries for what
+                  should be one fact was producing an intermittent mismatch
+                  between this presence check and AdSlot's own render. */}
+              {heroLeftAd && (
                 <div className="hidden lg:block w-[160px] shrink-0">
-                  <AdSlot position="HOME_HERO_LEFT" device="DESKTOP" className="w-full h-full rounded-lg overflow-hidden" fill />
+                  <div className="hidden md:flex w-full h-full justify-center items-center overflow-hidden rounded-lg">
+                    <AdMedia ad={heroLeftAd} fill />
+                  </div>
                 </div>
               )}
 

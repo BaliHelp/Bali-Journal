@@ -20,7 +20,7 @@ import { CommentSection } from '@/components/article/comment-section'
 import { EvidenceList } from '@/components/article/evidence-list'
 import { ArticleCard } from '@/components/article/article-card'
 import { ArticleActions } from '@/components/article/article-actions'
-import { AdSlot, getActiveAd } from '@/components/ads/ad-slot'
+import { AdSlot, AdMedia, getActiveAd } from '@/components/ads/ad-slot'
 import type { Category } from '@prisma/client'
 
 interface ArticlePageProps {
@@ -150,10 +150,16 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
       <article className="py-8">
         <div className="container mx-auto max-w-7xl px-4">
         <div className="flex gap-6 justify-center">
-        {/* Left ad rail - only reserved when there's actually an ad to show */}
+        {/* Left ad rail - only reserved when there's actually an ad to show.
+            Renders leftAd (already fetched above) directly via AdMedia instead
+            of <AdSlot>, which would re-run its own independent query for the
+            same data - two separate queries for one fact was producing an
+            intermittent hydration mismatch between this check and the render. */}
         {leftAd && (
           <div className="hidden lg:block w-[160px] shrink-0 sticky top-24 self-start">
-            <AdSlot position="ARTICLE_LEFT" device="DESKTOP" className="w-full" />
+            <div className="hidden md:flex w-full justify-center items-center overflow-hidden">
+              <AdMedia ad={leftAd} />
+            </div>
           </div>
         )}
 
@@ -322,11 +328,21 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </div>
         </div>
 
-        {/* Right ad rail - 2 stacked slots, only reserved when at least one has an ad */}
+        {/* Right ad rail - 2 stacked slots, only reserved when at least one has an ad.
+            Same reasoning as the left rail: render the already-fetched ads
+            directly rather than letting <AdSlot> re-query independently. */}
         {(rightTopAd || rightBottomAd) && (
           <div className="hidden lg:flex lg:flex-col gap-6 w-[300px] shrink-0 sticky top-24 self-start">
-            <AdSlot position="ARTICLE_RIGHT_TOP" device="DESKTOP" className="w-full" />
-            <AdSlot position="ARTICLE_RIGHT_BOTTOM" device="DESKTOP" className="w-full" />
+            {rightTopAd && (
+              <div className="hidden md:flex w-full justify-center items-center overflow-hidden">
+                <AdMedia ad={rightTopAd} />
+              </div>
+            )}
+            {rightBottomAd && (
+              <div className="hidden md:flex w-full justify-center items-center overflow-hidden">
+                <AdMedia ad={rightBottomAd} />
+              </div>
+            )}
           </div>
         )}
         </div>
