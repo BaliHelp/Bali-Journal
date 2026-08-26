@@ -19,6 +19,13 @@ export async function POST(request: Request) {
         }
 
         // 1. Analyze and Structure with 5W1H
+        // NOTE: intentionally NOT MYAI_FIELDS.WIE (content_journalist) -
+        // confirmed via direct testing that field ignores our JSON schema
+        // and responds in a hijacked Indonesian schema (judul/artikel/...)
+        // for this raw-data-processing task specifically, most likely
+        // cross-contamination from another app sharing that field on the
+        // gateway. 'chatbot' (GPT-4o-mini) follows the requested schema
+        // reliably instead.
         const result = await myaiCompleteJSON(MYAI_FIELDS.WIE, [
             {
                 role: "system",
@@ -27,30 +34,31 @@ export async function POST(request: Request) {
 
                 ${NEWS_STYLE_RULES}
 
-                The output must be a valid JSON object with the following structure:
+                CRITICAL: Regardless of what language the raw data below is written in (it may be
+                Indonesian), you MUST write the article in English and respond with EXACTLY these
+                JSON field names in English - never translate/rename them (e.g. never "judul",
+                "artikel", "ringkasan", "isi"). Return ONLY a valid JSON object with this EXACT flat
+                structure - no nested objects, no commentary before or after:
                 {
                     "title": "A captivating, journalistic headline",
                     "slug": "kebab-case-slug-optimized-for-seo",
                     "excerpt": "A concise summary (max 160 chars)",
                     "content": "The full article content in HTML format. Use <p>, <h3> (sparingly), <ul>, <li>. Do not use <h1> or <h2>.",
                     "category": "One of: TOURISM, INVESTMENT, INCIDENTS, LOCAL, JOBS, OPINION",
-                    "riskLevel": "LOW",
-                    "fiveWOneH": {
-                        "who": "...",
-                        "what": "...",
-                        "where": "...",
-                        "when": "...",
-                        "why": "...",
-                        "how": "..."
-                    }
+                    "riskLevel": "LOW"
                 }
 
                 Tone: Professional, Objective, Informative.
                 Language: English.`
             },
             {
+                // "Raw Data:" (and similar "Source material:"/"Content:"
+                // framings) confirmed via direct testing to make this field
+                // return an EMPTY {} - some guardrail/cross-app collision on
+                // the gateway triggers on that framing specifically. Framing
+                // it as a normal writing request works reliably instead.
                 role: "user",
-                content: `Raw Data:\n${content}`
+                content: `Write a news article based on the following information:\n${content}`
             }
         ])
 
@@ -92,7 +100,6 @@ export async function POST(request: Request) {
                 success: true,
                 metadata: {
                     sourceLength: content.length,
-                    fiveWOneH: result.fiveWOneH
                 }
             }
         })

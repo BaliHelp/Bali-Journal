@@ -19,17 +19,40 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'URL is required' }, { status: 400 })
         }
 
-        // 1. Fetch external content (Simple fetch for now)
-        // Note: Real production would use Puppeteer or Cheerio, but we keep it simple to avoid deps
+        // 1. Fetch external content - plain server-side fetch, no browser
+        // rendering and no vision model involved. JS-heavy sites that render
+        // their article body client-side won't extract cleanly this way.
+        //
+        // Was previously feeding the AI 15000 raw HTML characters truncated
+        // by byte count (not tag-aware) - confirmed via direct testing this
+        // regularly broke the AI's JSON output ("Unterminated string in
+        // JSON") because raw markup (scripts, styles, nav/ad boilerplate,
+        // unescaped quotes) doesn't truncate or embed into a JSON string
+        // cleanly. Strip to plain text first so the model gets the actual
+        // article prose instead of markup soup.
         let content = ""
         try {
-            const res = await fetch(url)
+            const res = await fetch(url, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NewsBaliBot/1.0)' },
+                signal: AbortSignal.timeout(20_000),
+            })
             const html = await res.text()
-            // Very naive extraction: get all p tags. 
-            // Better: use a library like 'cheerio' or 'jsdom' if installed. 
-            // For now, let's assume we pass the raw HTML to AI and ask it to extract.
-            // Truncate to avoid token limits.
-            content = html.substring(0, 15000)
+            content = html
+                .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+                .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+                .replace(/<!--[\s\S]*?-->/g, ' ')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/&nbsp;|&amp;|&quot;|&#39;|&lt;|&gt;/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 8000)
+
+            if (content.length < 200) {
+                return NextResponse.json(
+                    { error: 'Extracted content too short - this page likely renders its article via JavaScript, which a plain server-side fetch cannot execute.' },
+                    { status: 422 }
+                )
+            }
         } catch (e) {
             return NextResponse.json({ error: 'Failed to fetch URL' }, { status: 500 })
         }
@@ -45,14 +68,21 @@ TASK: Read the provided HTML/text from a source URL. Extract the main news story
 
 ${NEWS_STYLE_RULES}
 
-CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing else - no commentary before or after:
+CRITICAL: Regardless of what language the source material is written in, you MUST write the
+article in English and respond with EXACTLY these JSON field names in English - never
+translate/rename them. Return ONLY a valid JSON object with this EXACT structure and nothing
+else - no commentary before or after:
 {
   "title": "Catchy but professional headline (max 80 characters)",
   "excerpt": "A 1-2 sentence summary",
   "content": "The full article content as HTML (<p>, <h3>), several paragraphs, LONG and detailed",
   "riskLevel": "LOW or MEDIUM or HIGH"
 }` },
-            { role: "user", content: `Source URL: ${url}\n\nContent:\n${content}` }
+            // Same "Raw Data:"/"Source:...Content:" framing issue as
+            // process-raw-data - confirmed via direct testing this makes
+            // content_journalist return an empty {}. Plain "write about"
+            // framing works reliably.
+            { role: "user", content: `Write a news article about the story described in this source material (from ${url}):\n\n${content}` }
         ])
 
         if (!articleData.title) {

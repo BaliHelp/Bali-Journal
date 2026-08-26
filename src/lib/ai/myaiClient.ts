@@ -19,6 +19,7 @@ export type MyaiField =
     | 'content_journalist'
     | 'reasoning_general'
     | 'chatbot'
+    | 'structured_extraction'
 
 // Per-agent task field. WIE (writer) and WUE (breaking news) both produce
 // article copy, AUDY (compliance/moderation/legal-risk/tone) makes judgment
