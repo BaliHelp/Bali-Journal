@@ -75,7 +75,9 @@ import {
   Upload,
   Users2,
   Receipt,
-  DollarSign
+  DollarSign,
+  Copy,
+  CopyCheck
 } from 'lucide-react'
 import Image from 'next/image'
 import { AiControls } from '@/components/admin/ai-controls'
@@ -298,6 +300,33 @@ export default function MasterAdminDashboard() {
   // Data states
   const [articles, setArticles] = useState<Article[]>([])
   const [listNewsSearch, setListNewsSearch] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  function formatArticleForCopy(a: { category: string; title: string; excerpt: string }): string {
+    return `Kategori: ${a.category}\nJudul: ${a.title}\nRingkasan: ${a.excerpt}`
+  }
+
+  async function handleCopyArticle(a: { id: string; category: string; title: string; excerpt: string }) {
+    try {
+      await navigator.clipboard.writeText(formatArticleForCopy(a))
+      setCopiedId(a.id)
+      setTimeout(() => setCopiedId((current) => (current === a.id ? null : current)), 1500)
+    } catch {
+      setError('Gagal menyalin ke clipboard')
+    }
+  }
+
+  async function handleCopyAllArticles(list: { id: string; category: string; title: string; excerpt: string }[]) {
+    if (list.length === 0) return
+    try {
+      await navigator.clipboard.writeText(list.map(formatArticleForCopy).join('\n\n'))
+      setCopiedId('all')
+      setSuccess(`${list.length} berita disalin ke clipboard!`)
+      setTimeout(() => setCopiedId((current) => (current === 'all' ? null : current)), 1500)
+    } catch {
+      setError('Gagal menyalin ke clipboard')
+    }
+  }
   const [reports, setReports] = useState<Report[]>([])
   const [comments, setComments] = useState<Comment[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -1194,8 +1223,33 @@ export default function MasterAdminDashboard() {
           <TabsContent value="listnews">
             <Card>
               <CardHeader>
-                <CardTitle>List News</CardTitle>
-                <CardDescription>Semua berita - Kategori, Judul, dan Ringkasan singkat</CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>List News</CardTitle>
+                    <CardDescription>Semua berita - Kategori, Judul, dan Ringkasan singkat</CardDescription>
+                  </div>
+                  {(() => {
+                    const filtered = articles.filter((a) => {
+                      const q = listNewsSearch.toLowerCase()
+                      return !q || a.title.toLowerCase().includes(q) || a.category.toLowerCase().includes(q)
+                    })
+                    return (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={filtered.length === 0}
+                        onClick={() => handleCopyAllArticles(filtered)}
+                      >
+                        {copiedId === 'all' ? (
+                          <CopyCheck className="h-4 w-4 mr-2" />
+                        ) : (
+                          <Copy className="h-4 w-4 mr-2" />
+                        )}
+                        Copy All ({filtered.length})
+                      </Button>
+                    )
+                  })()}
+                </div>
                 <div className="pt-2">
                   <Input
                     placeholder="Cari judul atau kategori..."
@@ -1212,6 +1266,7 @@ export default function MasterAdminDashboard() {
                       <TableHead className="w-[140px]">Category</TableHead>
                       <TableHead>Judul Berita</TableHead>
                       <TableHead>Short Description</TableHead>
+                      <TableHead className="w-[80px] text-right">Copy</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1227,11 +1282,20 @@ export default function MasterAdminDashboard() {
                           </TableCell>
                           <TableCell className="font-medium max-w-xs">{a.title}</TableCell>
                           <TableCell className="text-muted-foreground max-w-md">{a.excerpt}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleCopyArticle(a)}>
+                              {copiedId === a.id ? (
+                                <CopyCheck className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     {articles.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                           Belum ada berita.
                         </TableCell>
                       </TableRow>
