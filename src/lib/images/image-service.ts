@@ -355,11 +355,28 @@ function nextGeneratorStrategy(pool?: GeneratorStrategy[]): GeneratorStrategy {
 export async function generateAndStoreImage(
     title: string,
     promptOverride?: string,
-    context?: { category?: string; excerpt?: string },
+    context?: { category?: string; excerpt?: string; content?: string },
     pool?: GeneratorStrategy[]
 ): Promise<StoredImage> {
     const cleanTitle = cleanPromptText(title)
-    const prompt = promptOverride || buildImagePrompt(title, context?.category, context?.excerpt)
+
+    // Priority: explicit override > AI-reasoned prompt (when content is
+    // available - reads title+excerpt+a content slice, grounds the prompt
+    // in this specific story instead of generic category keywords, and
+    // rotates through several visual styles) > the deterministic template.
+    let prompt = promptOverride
+    if (!prompt && context?.content) {
+        const { buildReasonedImagePrompt } = await import('@/lib/ai/image-prompt-reasoner')
+        prompt = (await buildReasonedImagePrompt({
+            title,
+            excerpt: context.excerpt,
+            content: context.content,
+            category: context.category,
+        })) ?? undefined
+    }
+    if (!prompt) {
+        prompt = buildImagePrompt(title, context?.category, context?.excerpt)
+    }
 
     const candidates: ImageCandidate[] = []
 

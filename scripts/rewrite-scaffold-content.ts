@@ -20,7 +20,7 @@ import { PrismaClient } from '@prisma/client'
 import fs from 'fs/promises'
 import path from 'path'
 import { myaiCompleteJSON } from '../src/lib/ai/myaiClient'
-import { NEWS_STYLE_RULES } from '../src/lib/ai/journalism-style'
+import { pickWritingStyle } from '../src/lib/ai/journalism-style'
 
 const RUN_MODE = process.argv.includes('--run')
 const db = new PrismaClient()
@@ -81,7 +81,7 @@ async function main() {
           role: 'system',
           content: `You are a senior editor at NewsBali rewriting a draft that a junior AI writer produced with visible internal planning labels still in the text. Rewrite it into a clean, professional news article - same facts, quotes, names, and numbers, just restructured as real prose.
 
-${NEWS_STYLE_RULES}
+${pickWritingStyle().rules}
 
 Return ONLY a valid JSON object: { "content": "The rewritten article as HTML (<p>, <h3> sparingly)" }`,
         },

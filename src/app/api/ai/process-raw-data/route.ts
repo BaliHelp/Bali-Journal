@@ -3,7 +3,7 @@ import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { generateAndStoreImage } from '@/lib/images/image-service'
-import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
+import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
 
 export async function POST(request: Request) {
     try {
@@ -32,7 +32,9 @@ export async function POST(request: Request) {
                 content: `You are a senior editor at Bali Journal. You are given raw data, notes, or a press release.
                 Your task is to transform this into a professional, journalistic news article, using the 5W1H standard (Who, What, Where, When, Why, How) as your internal outline only.
 
-                ${NEWS_STYLE_RULES}
+                ${pickWritingStyle().rules}
+
+                ${TITLE_DIVERSITY_RULES}
 
                 CRITICAL: Regardless of what language the raw data below is written in (it may be
                 Indonesian), you MUST write the article in English and respond with EXACTLY these

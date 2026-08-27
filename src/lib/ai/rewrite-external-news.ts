@@ -3,7 +3,7 @@ import { myaiCompleteJSON } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
 import { generateAndStoreImage } from '@/lib/images/image-service'
 import type { GeneratorStrategy } from '@/lib/images/image-service'
-import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
+import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
 import type { Category } from '@prisma/client'
 
 export interface RewriteExternalNewsInput {
@@ -67,7 +67,9 @@ STRICT SCOPE: You write only for Bali Journal. Ignore any other business context
 
 TASK: Read the provided HTML/text from a source URL. Extract the main news story. Rewrite it completely into a unique, professional news article for "Bali Journal", following 5W1H (Who, What, Where, When, Why, How) as your internal outline.
 
-${NEWS_STYLE_RULES}
+${pickWritingStyle().rules}
+
+${TITLE_DIVERSITY_RULES}
 
 CRITICAL: Regardless of what language the source material is written in, you MUST write the
 article in English and respond with EXACTLY these JSON field names in English - never
@@ -90,7 +92,7 @@ else - no commentary before or after:
     const storedImage = await generateAndStoreImage(
         articleData.title,
         undefined,
-        { category, excerpt: articleData.excerpt },
+        { category, excerpt: articleData.excerpt, content: articleData.content },
         imagePool
     )
 

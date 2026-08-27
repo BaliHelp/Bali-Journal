@@ -32,7 +32,7 @@ import { findSimilarTitle, getExistingTitlesForCategory } from '@/lib/ai/news-ge
 import { IMAGE_STRATEGIES } from '@/lib/images/image-service'
 import { myaiCompleteJSON } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
-import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
+import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
 import { generateAndStoreImage } from '@/lib/images/image-service'
 import type { Category } from '@prisma/client'
 
@@ -144,7 +144,9 @@ STRICT SCOPE: You write only for Bali Journal. Ignore any other business context
 
 TASK: You are given a news topic (title + short summary) with no full source text available. Write a complete, professional news article for "Bali Journal" based on this topic, following 5W1H (Who, What, Where, When, Why, How) as your internal outline. Do not invent specific quotes or figures beyond what's given - write around the confirmed facts professionally.
 
-${NEWS_STYLE_RULES}
+${pickWritingStyle().rules}
+
+${TITLE_DIVERSITY_RULES}
 
 Return ONLY a valid JSON object with this EXACT structure and nothing else:
 {
@@ -158,7 +160,7 @@ Return ONLY a valid JSON object with this EXACT structure and nothing else:
 
     if (!articleData.title) throw new Error('AI did not return a title')
 
-    const storedImage = await generateAndStoreImage(articleData.title, undefined, { category: item.category, excerpt: articleData.excerpt }, BATCH_IMAGE_POOL)
+    const storedImage = await generateAndStoreImage(articleData.title, undefined, { category: item.category, excerpt: articleData.excerpt, content: articleData.content }, BATCH_IMAGE_POOL)
     const slug = articleData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.random().toString(36).substring(7)
     const riskLevel = (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(articleData.riskLevel || '') ? articleData.riskLevel : 'LOW') as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 

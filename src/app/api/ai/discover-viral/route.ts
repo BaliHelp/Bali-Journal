@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
 import { generateAndStoreImage } from '@/lib/images/image-service'
-import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
+import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
 import { getSession } from '@/lib/auth/session'
 
 export async function POST(req: NextRequest) {
@@ -37,7 +37,12 @@ Return ONLY a valid JSON object with this EXACT structure and nothing else:
         const trendingTopic = trendPick.headline || "Bali Tourism Surge"
 
         // 2. Generate Article based on this trend
-        const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>(MYAI_FIELDS.WUE, [
+        // 'chatbot' + gpt-4o-mini pinned, not MYAI_FIELDS.WUE
+        // (content_journalist) - confirmed that field is the same
+        // hijacked/broken one as WIE (returns empty {} or a different
+        // schema/language), same fix already applied to news-generator.ts/
+        // rewrite-external-news.ts/process-raw-data.
+        const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>('chatbot', [
             {
                 role: "system", content: `${AGENT_PERSONAS.WUE.instructions}
 
@@ -47,7 +52,9 @@ TASK: Write a detailed, dramatic but factual news article about this trending Ba
 
 Topic: "${trendingTopic}"
 
-${NEWS_STYLE_RULES}
+${pickWritingStyle().rules}
+
+${TITLE_DIVERSITY_RULES}
 
 CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing else - no commentary before or after:
 {
@@ -57,7 +64,7 @@ CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing 
   "riskLevel": "LOW or MEDIUM or HIGH"
 }` },
             { role: "user", content: `Write the article about: ${trendingTopic}` }
-        ])
+        ], 'gpt-4o-mini')
 
         if (!articleData.title) {
             throw new Error('AI response did not include a title - the model deviated from the requested JSON schema. Try again.')
@@ -67,6 +74,7 @@ CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing 
         const storedImage = await generateAndStoreImage(articleData.title, undefined, {
             category: category || 'LOCAL',
             excerpt: articleData.excerpt,
+            content: articleData.content,
         })
 
         // 4. Save

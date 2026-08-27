@@ -1,8 +1,8 @@
-import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
+import { myaiCompleteJSON } from '@/lib/ai/myaiClient'
 import { db } from '@/lib/db'
 import { Category, RiskLevel, Verification, Status } from '@prisma/client'
 import { generateAndStoreImage, insertInlineImages } from '@/lib/images/image-service'
-import { NEWS_STYLE_RULES } from '@/lib/ai/journalism-style'
+import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
 
 
 
@@ -117,11 +117,11 @@ async function generateArticleContent(category: Category, avoidTitles: string[] 
     SPECIFICATIONS:
     - Category: ${category}
     - Focus: ${CATEGORY_GUIDELINES[category]}
-    - Tone: Professional, Objective, Authoritative, Journalistic (Associated Press style).
     - Length: LONG FORM (800-1200 words equivalent).
-    - Structure: Follow the "Inverted Pyramid" + 5W 1H as your INTERNAL outline only (lead paragraph covering who/what/where/when/why/how, then supporting facts, quotes, context, impact, and what happens next, in that order of importance) - see the style rules below for how this must read on the page.
     ${avoidBlock}
-    ${NEWS_STYLE_RULES}
+    ${pickWritingStyle().rules}
+
+    ${TITLE_DIVERSITY_RULES}
 
     CONTENT RULES:
     - **REALISM**: Use REAL locations (specific streets in Canggu, offices in Renon, temples, etc.). Use REAL titles of officials (e.g., Governor, Head of Tourism Board).
@@ -139,7 +139,11 @@ async function generateArticleContent(category: Category, avoidTitles: string[] 
     `
 
     try {
-        const result = await myaiCompleteJSON(MYAI_FIELDS.WIE, [
+        // 'chatbot' + gpt-4o-mini pinned, not MYAI_FIELDS.WIE
+        // (content_journalist) - that field is confirmed hijacked/broken
+        // (returns empty {} or a different schema/language), same fix
+        // already applied to rewrite-external-news.ts/process-raw-data.
+        const result = await myaiCompleteJSON('chatbot', [
             {
                 role: 'system',
                 content: 'You are an award-winning journalist. Output strictly valid JSON.'
@@ -148,7 +152,7 @@ async function generateArticleContent(category: Category, avoidTitles: string[] 
                 role: 'user',
                 content: prompt
             }
-        ])
+        ], 'gpt-4o-mini')
 
         return {
             title: result.title,
@@ -215,6 +219,7 @@ export async function generateNewsArticles(count: number = 3, authorId: string, 
             const stored = await generateAndStoreImage(generated.title, undefined, {
                 category,
                 excerpt: generated.excerpt,
+                content: generated.content,
             })
 
             // Additional images placed inside the article body itself (not

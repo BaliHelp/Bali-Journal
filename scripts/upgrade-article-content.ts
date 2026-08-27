@@ -21,7 +21,7 @@ import { PrismaClient } from '@prisma/client'
 import fs from 'fs/promises'
 import path from 'path'
 import { myaiCompleteJSON } from '../src/lib/ai/myaiClient'
-import { NEWS_STYLE_RULES } from '../src/lib/ai/journalism-style'
+import { pickWritingStyle } from '../src/lib/ai/journalism-style'
 
 const RUN_MODE = process.argv.includes('--run')
 const db = new PrismaClient()
@@ -78,7 +78,7 @@ Category: ${a.category}
 Existing draft (contains the core facts/story - use them, do not contradict them, but you may add standard, uncontroversial contextual detail a real reporter would include - e.g. background on Bali tourism/economy/government trends, plausible reactions, next steps):
 ${a.content}
 
-${NEWS_STYLE_RULES}
+${pickWritingStyle().rules}
 
 Return ONLY a valid JSON object: { "excerpt": "A powerful 2-sentence summary", "content": "The full rewritten article as HTML (<p>, <h3> sparingly)" }`
 
