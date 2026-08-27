@@ -69,7 +69,7 @@ function titleWords(title: string): Set<string> {
     )
 }
 
-function titleSimilarity(a: string, b: string): number {
+export function titleSimilarity(a: string, b: string): number {
     const setA = titleWords(a)
     const setB = titleWords(b)
     const intersection = [...setA].filter((w) => setB.has(w)).length
@@ -78,7 +78,7 @@ function titleSimilarity(a: string, b: string): number {
 }
 
 /** Existing titles in this category (published or draft) that a new article must not echo. */
-async function getExistingTitlesForCategory(category: Category): Promise<string[]> {
+export async function getExistingTitlesForCategory(category: Category): Promise<string[]> {
     const existing = await db.article.findMany({
         where: { category, status: { in: ['PUBLISHED', 'DRAFT'] } },
         select: { title: true },
@@ -88,7 +88,7 @@ async function getExistingTitlesForCategory(category: Category): Promise<string[
     return existing.map((a) => a.title)
 }
 
-function findSimilarTitle(candidate: string, existingTitles: string[]): string | null {
+export function findSimilarTitle(candidate: string, existingTitles: string[]): string | null {
     for (const existing of existingTitles) {
         if (titleSimilarity(candidate, existing) >= TITLE_SIMILARITY_THRESHOLD) return existing
     }

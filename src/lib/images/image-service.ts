@@ -280,6 +280,24 @@ const geminiStrategy: GeneratorStrategy = {
     ],
 }
 
+// Real stock photography (not generative) - see providers/unsplash.ts. Only
+// used via an explicit `pool` override (bulk backfill batches), never the
+// default GENERATOR_POOL - see nextGeneratorStrategy()'s batch-pool branch.
+const unsplashStrategy: GeneratorStrategy = {
+    name: 'unsplash',
+    buildCandidates: (prompt, cleanTitle) => [
+        {
+            label: 'Stock Photo (Unsplash)',
+            fetch: async () => {
+                const { searchUnsplashPhoto } = await import('@/lib/ai/providers/unsplash')
+                return searchUnsplashPhoto(`bali ${cleanTitle}`)
+            },
+        },
+        urlCandidate(buildPollinationsUrl(prompt), 'AI-Generated Illustration'),
+        LOREMFLICKR_FALLBACK(cleanTitle),
+    ],
+}
+
 // Gemini-primary (2:1 gemini:pollinations). Originally the other way around,
 // but flipped after an NSFW audit of the published backlog (2026-08-26)
 // found Pollinations repeatedly generating content depicting apparent
@@ -294,8 +312,24 @@ const geminiStrategy: GeneratorStrategy = {
 // LoremFlickr if both Gemini keys fail on a given call.
 const GENERATOR_POOL: GeneratorStrategy[] = [geminiStrategy, geminiStrategy, pollinationsStrategy]
 
+// Named export so a caller (e.g. the bulk backfill script) can build its own
+// wider pool - e.g. [geminiStrategy, geminiStrategy, pollinationsStrategy,
+// unsplashStrategy] - without duplicating these strategy definitions.
+export const IMAGE_STRATEGIES = { gemini: geminiStrategy, pollinations: pollinationsStrategy, unsplash: unsplashStrategy }
+export type { GeneratorStrategy }
+
 let rotationIndex = 0
-function nextGeneratorStrategy(): GeneratorStrategy {
+// Separate counter for custom (batch-only) pools, so passing a `pool`
+// override to generateAndStoreImage() never perturbs the default pool's
+// rotation state for the site's normal, concurrent day-to-day generation.
+let batchRotationIndex = 0
+
+function nextGeneratorStrategy(pool?: GeneratorStrategy[]): GeneratorStrategy {
+    if (pool) {
+        const strategy = pool[batchRotationIndex % pool.length]
+        batchRotationIndex++
+        return strategy
+    }
     const strategy = GENERATOR_POOL[rotationIndex % GENERATOR_POOL.length]
     rotationIndex++
     return strategy
@@ -313,11 +347,16 @@ function nextGeneratorStrategy(): GeneratorStrategy {
  * @param context Category/excerpt used to build the default prompt when no
  *   promptOverride is given - skip this and the prompt falls back to a
  *   generic "bali news" framing.
+ * @param pool Override the generator rotation for this call only (own
+ *   counter, doesn't touch the default pool's rotation state) - for one-off
+ *   bulk batches that want wider source variety than the site's normal
+ *   day-to-day generation. Omit for standard behavior.
  */
 export async function generateAndStoreImage(
     title: string,
     promptOverride?: string,
-    context?: { category?: string; excerpt?: string }
+    context?: { category?: string; excerpt?: string },
+    pool?: GeneratorStrategy[]
 ): Promise<StoredImage> {
     const cleanTitle = cleanPromptText(title)
     const prompt = promptOverride || buildImagePrompt(title, context?.category, context?.excerpt)
@@ -328,7 +367,7 @@ export async function generateAndStoreImage(
         candidates.push(urlCandidate(buildPollinationsUrl(promptOverride), 'AI-Generated Illustration'))
     }
 
-    const strategy = nextGeneratorStrategy()
+    const strategy = nextGeneratorStrategy(pool)
     candidates.push(...strategy.buildCandidates(prompt, cleanTitle))
 
     for (const candidate of candidates) {
