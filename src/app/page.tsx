@@ -95,23 +95,28 @@ export default async function HomePage() {
                 lines up EXACTLY with the featured image's bottom edge, and the
                 below-hero banner sits underneath spanning the full width. */}
             <div className="flex-1 min-w-0 flex flex-col gap-6">
-              <div className="flex flex-col lg:flex-row gap-6">
-              {/* Ad rail - only takes up space when there's actually an ad to show.
-                  Renders heroLeftAd (already fetched above) directly instead of
-                  going through <AdSlot>, which would re-run its own independent
-                  DB query for the same data - two separate queries for what
-                  should be one fact was producing an intermittent mismatch
-                  between this presence check and AdSlot's own render. */}
+              {/* Absolute positioning, not flex/grid stretch - both of those let the
+                  rail's OWN ad creative (a real 160x600 "Wide Skyscraper" IAB format,
+                  i.e. genuinely tall at its native aspect ratio) drive the shared
+                  row's auto-height upward before any stretch is applied, so the row
+                  ended up as tall as the ad itself instead of as tall as the
+                  featured image. An absolutely positioned element with inset-y-0
+                  is removed from normal flow entirely - it can't influence its
+                  container's height, and top:0/bottom:0 forces ITS height to match
+                  the container's height exactly, whatever that turns out to be.
+                  The image below is the only thing in normal flow here, so it
+                  alone determines this wrapper's height; lg:pl-[184px] (rail's
+                  160px + the gap-6 that used to separate them) reserves the rail's
+                  visual space without it participating in flow. */}
+              <div className="relative">
               {heroLeftAd && (
-                <div className="hidden lg:block w-[160px] shrink-0">
-                  <div className="hidden md:flex w-full h-full justify-center items-center overflow-hidden rounded-lg">
-                    <AdMedia ad={heroLeftAd} fill />
-                  </div>
+                <div className="hidden lg:block absolute inset-y-0 left-0 w-[160px] overflow-hidden rounded-lg">
+                  <AdMedia ad={heroLeftAd} fill />
                 </div>
               )}
 
             {/* Featured Article image */}
-            <div className="flex-1 min-w-0">
+            <div className={heroLeftAd ? 'lg:pl-[184px]' : ''}>
               {featuredArticle ? (
                 <Link href={`/article/${featuredArticle.slug}`} className="group block">
                   <div className="relative aspect-[16/9] overflow-hidden rounded-lg bg-muted shadow-lg">
