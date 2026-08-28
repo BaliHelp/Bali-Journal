@@ -87,14 +87,21 @@ export default async function HomePage() {
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-muted/50 to-background">
         <div className="container mx-auto max-w-7xl px-4 py-8">
-          <div className="flex flex-col lg:flex-row gap-6">
+          {/* relative + no lg:flex-row: at lg+ the sidebar below is taken out of
+              flow (absolute) and pinned to this container's height instead of
+              being a flex sibling - see the sidebar's comment for why (fixed-height
+              scroll areas kept winning the flex row's auto-height and overflowing
+              past the hero column). At <lg both stay in normal flex-col flow. */}
+          <div className="relative flex flex-col gap-6">
             {/* Ad rail + Featured Article image are grouped in their own row, nested
                 inside a column with the below-hero banner - this way the row's
                 only two items (rail, image) stretch to match each other exactly
                 (default flex align-items: stretch), so the rail's bottom edge
                 lines up EXACTLY with the featured image's bottom edge, and the
-                below-hero banner sits underneath spanning the full width. */}
-            <div className="flex-1 min-w-0 flex flex-col gap-6">
+                below-hero banner sits underneath spanning the full width.
+                lg:pr-[404px] reserves the absolutely positioned sidebar's space
+                (380px width + the gap-6 that used to sit between them). */}
+            <div className="flex-1 min-w-0 flex flex-col gap-6 lg:pr-[404px]">
               {/* Absolute positioning, not flex/grid stretch - both of those let the
                   rail's OWN ad creative (a real 160x600 "Wide Skyscraper" IAB format,
                   i.e. genuinely tall at its native aspect ratio) drive the shared
@@ -170,8 +177,20 @@ export default async function HomePage() {
               <AdSlot position="HOME_HERO_BELOW" device="DESKTOP" className="w-full h-40 rounded-lg overflow-hidden shrink-0" fill />
             </div>
 
-            {/* Sidebar - Latest News (Scrollable) */}
-            <div className="lg:w-[380px] shrink-0 flex flex-col h-full bg-background/50 rounded-lg border p-4">
+            {/* Sidebar - Latest News (Scrollable). At lg+, absolutely positioned
+                (inset-y-0 right-0) against the relative row above instead of a
+                flex sibling - a plain flex/grid sibling let this box's own fixed-
+                height scroll area (h-[500px]) act as ITS natural/hypothetical
+                size, which made the ROW's auto-height follow the sidebar instead
+                of the hero column, so the sidebar rendered at its own full
+                height and overflowed below the hero column's actual bottom edge.
+                Absolute positioning removes it from that calculation entirely -
+                inset-y-0 forces its height to match the row's real height
+                (driven only by the hero column, now the row's only in-flow
+                item), and the inner scroll area's lg:flex-1 lg:min-h-0 fills
+                whatever that turns out to be. Below lg it stays in normal flow
+                (stacked under the hero column) with its original fixed height. */}
+            <div className="flex flex-col bg-background/50 rounded-lg border p-4 lg:absolute lg:inset-y-0 lg:right-0 lg:w-[380px]">
               <div className="flex items-center justify-between mb-4 sticky top-0 bg-background/50 backdrop-blur-sm py-2 z-10 border-b">
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-primary" />
@@ -182,7 +201,7 @@ export default async function HomePage() {
                 </Badge>
               </div>
 
-              <div className="overflow-y-auto h-[500px] pr-2 space-y-4 scrollbar-thin scrollbar-thumb-primary/20 hover:scrollbar-thumb-primary/40">
+              <div className="overflow-y-auto h-[500px] lg:h-auto lg:flex-1 lg:min-h-0 pr-2 space-y-4 scrollbar-thin scrollbar-thumb-primary/20 hover:scrollbar-thumb-primary/40">
                 {latestArticles.map((article) => (
                   <Link
                     key={article.id}
