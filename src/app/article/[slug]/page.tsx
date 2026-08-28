@@ -131,8 +131,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   await incrementViewCount(article.id)
 
   const otherCategoryArticles = await getOtherCategoryArticles(article.id, article.category)
-  const [leftAd, rightTopAd, rightBottomAd] = await Promise.all([
+  const [leftAd, leftBottomAd, rightTopAd, rightBottomAd] = await Promise.all([
     getActiveAd('ARTICLE_LEFT', 'DESKTOP'),
+    getActiveAd('ARTICLE_LEFT_BOTTOM', 'DESKTOP'),
     getActiveAd('ARTICLE_RIGHT_TOP', 'DESKTOP'),
     getActiveAd('ARTICLE_RIGHT_BOTTOM', 'DESKTOP'),
   ])
@@ -144,16 +145,24 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
       <article className="py-8">
         <div className="container mx-auto max-w-7xl px-4">
         <div className="flex gap-6 justify-center">
-        {/* Left ad rail - only reserved when there's actually an ad to show.
-            Renders leftAd (already fetched above) directly via AdMedia instead
-            of <AdSlot>, which would re-run its own independent query for the
-            same data - two separate queries for one fact was producing an
-            intermittent hydration mismatch between this check and the render. */}
-        {leftAd && (
-          <div className="hidden lg:block w-[160px] shrink-0 sticky top-24 self-start">
-            <div className="hidden md:flex w-full justify-center items-center overflow-hidden">
-              <AdMedia ad={leftAd} />
-            </div>
+        {/* Left ad rail - 2 stacked slots (mirrors the right rail below), only
+            reserved when at least one has an ad. Renders leftAd/leftBottomAd
+            (already fetched above) directly via AdMedia instead of <AdSlot>,
+            which would re-run its own independent query for the same data -
+            two separate queries for one fact was producing an intermittent
+            hydration mismatch between this check and the render. */}
+        {(leftAd || leftBottomAd) && (
+          <div className="hidden lg:flex lg:flex-col gap-6 w-[160px] shrink-0 sticky top-24 self-start">
+            {leftAd && (
+              <div className="hidden md:flex w-full justify-center items-center overflow-hidden">
+                <AdMedia ad={leftAd} />
+              </div>
+            )}
+            {leftBottomAd && (
+              <div className="hidden md:flex w-full justify-center items-center overflow-hidden">
+                <AdMedia ad={leftBottomAd} />
+              </div>
+            )}
           </div>
         )}
 

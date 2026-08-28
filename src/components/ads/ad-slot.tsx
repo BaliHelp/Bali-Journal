@@ -11,6 +11,7 @@ export type AdPositionValue =
   | 'HOME_HERO_MINI'
   | 'HOME_HERO_BELOW'
   | 'ARTICLE_LEFT'
+  | 'ARTICLE_LEFT_BOTTOM'
   | 'ARTICLE_RIGHT_TOP'
   | 'ARTICLE_RIGHT_BOTTOM'
 

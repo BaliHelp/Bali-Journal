@@ -141,6 +141,7 @@ const AD_POSITIONS: { value: string; label: string; width: number; height: numbe
   { value: 'HOME_HERO_MINI', label: 'Beranda - Mini Box (bawah rail kiri)', width: 160, height: 160 },
   { value: 'HOME_HERO_BELOW', label: 'Beranda - Banner Bawah Hero', width: 800, height: 150 },
   { value: 'ARTICLE_LEFT', label: 'Artikel - Rail Kiri', width: 160, height: 600 },
+  { value: 'ARTICLE_LEFT_BOTTOM', label: 'Artikel - Rail Kiri Bawah', width: 160, height: 300 },
   { value: 'ARTICLE_RIGHT_TOP', label: 'Artikel - Rail Kanan Atas', width: 300, height: 250 },
   { value: 'ARTICLE_RIGHT_BOTTOM', label: 'Artikel - Rail Kanan Bawah', width: 300, height: 600 },
   { value: 'IN_ARTICLE', label: 'Dalam Artikel (antar paragraf)', width: 336, height: 280 },
