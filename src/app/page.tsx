@@ -88,28 +88,30 @@ export default async function HomePage() {
       <section className="bg-gradient-to-b from-muted/50 to-background">
         <div className="container mx-auto max-w-7xl px-4 py-8">
           <div className="flex flex-col lg:flex-row gap-6">
-            {/* Ad rail + Featured Article are grouped in their own flex-row. */}
-            <div className="flex-1 min-w-0 flex flex-col lg:flex-row gap-6">
+            {/* Ad rail + Featured Article image are grouped in their own row, nested
+                inside a column with the below-hero banner - this way the row's
+                only two items (rail, image) stretch to match each other exactly
+                (default flex align-items: stretch), so the rail's bottom edge
+                lines up EXACTLY with the featured image's bottom edge, and the
+                below-hero banner sits underneath spanning the full width. */}
+            <div className="flex-1 min-w-0 flex flex-col gap-6">
+              <div className="flex flex-col lg:flex-row gap-6">
               {/* Ad rail - only takes up space when there's actually an ad to show.
-                  Fixed w-[160px] + aspect-[2/5] (not h-full stretch) so it stays a
-                  short, proportioned skyscraper instead of stretching to match the
-                  featured-article column's full height (image + below-hero banner),
-                  which looked oddly elongated. Renders heroLeftAd (already fetched
-                  above) directly instead of going through <AdSlot>, which would
-                  re-run its own independent DB query for the same data - two
-                  separate queries for what should be one fact was producing an
-                  intermittent mismatch between this presence check and AdSlot's
-                  own render. */}
+                  Renders heroLeftAd (already fetched above) directly instead of
+                  going through <AdSlot>, which would re-run its own independent
+                  DB query for the same data - two separate queries for what
+                  should be one fact was producing an intermittent mismatch
+                  between this presence check and AdSlot's own render. */}
               {heroLeftAd && (
-                <div className="hidden lg:block w-[160px] aspect-[2/5] self-start shrink-0">
+                <div className="hidden lg:block w-[160px] shrink-0">
                   <div className="hidden md:flex w-full h-full justify-center items-center overflow-hidden rounded-lg">
                     <AdMedia ad={heroLeftAd} fill />
                   </div>
                 </div>
               )}
 
-            {/* Featured Article */}
-            <div className="flex-1 min-w-0 flex flex-col gap-6">
+            {/* Featured Article image */}
+            <div className="flex-1 min-w-0">
               {featuredArticle ? (
                 <Link href={`/article/${featuredArticle.slug}`} className="group block">
                   <div className="relative aspect-[16/9] overflow-hidden rounded-lg bg-muted shadow-lg">
@@ -158,8 +160,9 @@ export default async function HomePage() {
                   <p className="text-muted-foreground">No articles yet</p>
                 </div>
               )}
-              <AdSlot position="HOME_HERO_BELOW" device="DESKTOP" className="w-full h-40 rounded-lg overflow-hidden shrink-0" fill />
             </div>
+              </div>
+              <AdSlot position="HOME_HERO_BELOW" device="DESKTOP" className="w-full h-40 rounded-lg overflow-hidden shrink-0" fill />
             </div>
 
             {/* Sidebar - Latest News (Scrollable) */}
