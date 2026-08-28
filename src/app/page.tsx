@@ -88,18 +88,20 @@ export default async function HomePage() {
       <section className="bg-gradient-to-b from-muted/50 to-background">
         <div className="container mx-auto max-w-7xl px-4 py-8">
           <div className="flex flex-col lg:flex-row gap-6">
-            {/* Ad rail + Featured Article are grouped in their own flex-row so
-                the rail's stretched height matches ONLY this column (hero +
-                below-hero banner), not the taller Breaking News sidebar. */}
+            {/* Ad rail + Featured Article are grouped in their own flex-row. */}
             <div className="flex-1 min-w-0 flex flex-col lg:flex-row gap-6">
               {/* Ad rail - only takes up space when there's actually an ad to show.
-                  Renders heroLeftAd (already fetched above) directly instead of
-                  going through <AdSlot>, which would re-run its own independent
-                  DB query for the same data - two separate queries for what
-                  should be one fact was producing an intermittent mismatch
-                  between this presence check and AdSlot's own render. */}
+                  Fixed w-[160px] + aspect-[2/5] (not h-full stretch) so it stays a
+                  short, proportioned skyscraper instead of stretching to match the
+                  featured-article column's full height (image + below-hero banner),
+                  which looked oddly elongated. Renders heroLeftAd (already fetched
+                  above) directly instead of going through <AdSlot>, which would
+                  re-run its own independent DB query for the same data - two
+                  separate queries for what should be one fact was producing an
+                  intermittent mismatch between this presence check and AdSlot's
+                  own render. */}
               {heroLeftAd && (
-                <div className="hidden lg:block w-[160px] shrink-0">
+                <div className="hidden lg:block w-[160px] aspect-[2/5] self-start shrink-0">
                   <div className="hidden md:flex w-full h-full justify-center items-center overflow-hidden rounded-lg">
                     <AdMedia ad={heroLeftAd} fill />
                   </div>

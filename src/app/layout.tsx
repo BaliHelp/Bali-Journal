@@ -7,7 +7,6 @@ import { Footer } from '@/components/layout/footer'
 import { BreakingNews } from '@/components/layout/breaking-news'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AdSlot } from '@/components/ads/ad-slot'
-import { RotatingAdSlot } from '@/components/ads/rotating-ad-slot'
 import { PlaceAdsCTA } from '@/components/ads/place-ads-cta'
 import { OrganizationJsonLd, WebsiteJsonLd } from '@/components/seo/article-json-ld'
 
@@ -80,7 +79,6 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <div className="min-h-screen flex flex-col">
             <Header />
-            <RotatingAdSlot position="HEADER" device="DESKTOP" className="py-2" />
             <AdSlot position="MOBILE_BANNER" device="MOBILE" className="py-2" />
             <BreakingNews />
             <main className="flex-1">
