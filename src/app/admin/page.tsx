@@ -27,6 +27,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Dialog,
@@ -346,6 +347,7 @@ export default function MasterAdminDashboard() {
   // title (standard "slug follows title until touched" pattern).
   const [slugTouched, setSlugTouched] = useState(false)
   const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
+  const [statDialog, setStatDialog] = useState<'articles' | 'comments' | 'risk' | 'users' | null>(null)
   const [editingArticle, setEditingArticle] = useState<Article | null>(null)
   const [showArticleDialog, setShowArticleDialog] = useState(false)
   const [analyzingRisk, setAnalyzingRisk] = useState(false)
@@ -1162,53 +1164,6 @@ export default function MasterAdminDashboard() {
       </header>
 
       <main className="px-4 py-6 md:px-6">
-        {/* Quick Stats & Alerts */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Articles</p>
-                <h3 className="text-2xl font-bold">{stats.totalArticles}</h3>
-              </div>
-              <FileText className="h-8 w-8 text-blue-500 opacity-20" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending Comments</p>
-                <h3 className="text-2xl font-bold">{stats.pendingComments}</h3>
-              </div>
-              <MessageCircle className="h-8 w-8 text-yellow-500 opacity-20" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">High Risk Articles</p>
-                <h3 className="text-2xl font-bold">{stats.highRiskArticles}</h3>
-              </div>
-              <Shield className="h-8 w-8 text-red-500 opacity-20" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Users</p>
-                <h3 className="text-2xl font-bold">{stats.totalUsers}</h3>
-              </div>
-              <Users className="h-8 w-8 text-green-500 opacity-20" />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* System Health Check */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <SystemHealthCard />
-          <AgentStatusCard />
-          <ScheduleCard />
-        </div>
-
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
@@ -1227,19 +1182,206 @@ export default function MasterAdminDashboard() {
 
           <TabsContent value="overview">
             <div className="grid gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Welcome back, Admin</CardTitle>
-                  <CardDescription>
-                    Here is what's happening on Bali Journal today.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>Select a tab to manage content.</p>
-                </CardContent>
-              </Card>
+              <div>
+                <h2 className="text-xl font-semibold">Welcome back, Admin</h2>
+                <p className="text-sm text-muted-foreground">Here is what's happening on Bali Journal today.</p>
+              </div>
+
+              {/* Quick Stats - click a card for a breakdown */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setStatDialog('articles')}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Articles</p>
+                      <h3 className="text-2xl font-bold">{stats.totalArticles}</h3>
+                    </div>
+                    <FileText className="h-8 w-8 text-blue-500 opacity-20" />
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setStatDialog('comments')}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Pending Comments</p>
+                      <h3 className="text-2xl font-bold">{stats.pendingComments}</h3>
+                    </div>
+                    <MessageCircle className="h-8 w-8 text-yellow-500 opacity-20" />
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setStatDialog('risk')}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">High Risk Articles</p>
+                      <h3 className="text-2xl font-bold">{stats.highRiskArticles}</h3>
+                    </div>
+                    <Shield className="h-8 w-8 text-red-500 opacity-20" />
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setStatDialog('users')}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Users</p>
+                      <h3 className="text-2xl font-bold">{stats.totalUsers}</h3>
+                    </div>
+                    <Users className="h-8 w-8 text-green-500 opacity-20" />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* System Health Check - overview-only, was previously rendered
+                  outside the Tabs entirely so it showed up on every panel */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <SystemHealthCard />
+                <AgentStatusCard />
+                <ScheduleCard />
+              </div>
             </div>
           </TabsContent>
+
+          {/* Quick-stat detail popups - one Dialog, content swapped by which
+              card was clicked. Each just summarizes data already loaded into
+              state (no extra API calls) and offers a shortcut into the
+              relevant tab for the full view. */}
+          <Dialog open={statDialog !== null} onOpenChange={(open) => !open && setStatDialog(null)}>
+            <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+              {statDialog === 'articles' && (() => {
+                const byStatus = ['DRAFT', 'REVIEW', 'PUBLISHED', 'REJECTED'].map((s) => ({
+                  status: s,
+                  count: articles.filter((a) => a.status === s).length,
+                }))
+                const byCategory = Array.from(new Set(articles.map((a) => a.category)))
+                  .map((c) => ({ category: c, count: articles.filter((a) => a.category === c).length }))
+                  .sort((a, b) => b.count - a.count)
+                return (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Total Articles: {stats.totalArticles}</DialogTitle>
+                      <DialogDescription>Rincian berdasarkan status dan kategori.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Per Status</p>
+                        <div className="space-y-1">
+                          {byStatus.map((s) => (
+                            <div key={s.status} className="flex items-center justify-between text-sm">
+                              <span>{s.status}</span>
+                              <Badge variant="secondary">{s.count}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Per Kategori</p>
+                        <div className="space-y-1">
+                          {byCategory.map((c) => (
+                            <div key={c.category} className="flex items-center justify-between text-sm">
+                              <span>{c.category}</span>
+                              <Badge variant="secondary">{c.count}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={() => { setActiveTab('articles'); setStatDialog(null) }}>Buka Tab Articles</Button>
+                    </DialogFooter>
+                  </>
+                )
+              })()}
+
+              {statDialog === 'comments' && (() => {
+                const pending = comments.filter((c) => c.status === 'PENDING')
+                return (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Pending Comments: {stats.pendingComments}</DialogTitle>
+                      <DialogDescription>Komentar yang menunggu moderasi.</DialogDescription>
+                    </DialogHeader>
+                    {pending.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4">Tidak ada komentar yang menunggu moderasi.</p>
+                    ) : (
+                      <ScrollArea className="max-h-80">
+                        <div className="space-y-3 pr-3">
+                          {pending.map((c) => (
+                            <div key={c.id} className="rounded-lg border p-3 text-sm">
+                              <p className="line-clamp-2">{c.content}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {c.user.name || c.user.email} · pada &quot;{c.article.title}&quot;
+                                {c.toxicityScore != null && <> · toksisitas {Math.round(c.toxicityScore * 100)}%</>}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                    <DialogFooter>
+                      <Button onClick={() => { setActiveTab('comments'); setStatDialog(null) }}>Buka Tab Comments</Button>
+                    </DialogFooter>
+                  </>
+                )
+              })()}
+
+              {statDialog === 'risk' && (() => {
+                const highRisk = articles
+                  .filter((a) => a.riskLevel === 'HIGH' || a.riskLevel === 'CRITICAL')
+                  .sort((a, b) => b.riskScore - a.riskScore)
+                return (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>High Risk Articles: {stats.highRiskArticles}</DialogTitle>
+                      <DialogDescription>Artikel dengan risiko hukum HIGH atau CRITICAL.</DialogDescription>
+                    </DialogHeader>
+                    {highRisk.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4">Tidak ada artikel berisiko tinggi saat ini.</p>
+                    ) : (
+                      <ScrollArea className="max-h-80">
+                        <div className="space-y-3 pr-3">
+                          {highRisk.map((a) => (
+                            <div key={a.id} className="rounded-lg border p-3 text-sm">
+                              <p className="font-medium line-clamp-1">{a.title}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant={a.riskLevel === 'CRITICAL' ? 'destructive' : 'secondary'}>
+                                  {a.riskLevel} · {a.riskScore}/100
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">{a.category} · {a.status}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                    <DialogFooter>
+                      <Button onClick={() => { setActiveTab('articles'); setStatDialog(null) }}>Buka Tab Articles</Button>
+                    </DialogFooter>
+                  </>
+                )
+              })()}
+
+              {statDialog === 'users' && (() => {
+                const byRole = Array.from(new Set(users.map((u) => u.role)))
+                  .map((r) => ({ role: r, count: users.filter((u) => u.role === r).length }))
+                  .sort((a, b) => b.count - a.count)
+                return (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Total Users: {stats.totalUsers}</DialogTitle>
+                      <DialogDescription>Rincian akun berdasarkan role.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-1">
+                      {byRole.map((r) => (
+                        <div key={r.role} className="flex items-center justify-between text-sm">
+                          <span>{r.role}</span>
+                          <Badge variant="secondary">{r.count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={() => { setActiveTab('users'); setStatDialog(null) }}>Buka Tab Users</Button>
+                    </DialogFooter>
+                  </>
+                )
+              })()}
+            </DialogContent>
+          </Dialog>
 
           <TabsContent value="listnews">
             <Card>
