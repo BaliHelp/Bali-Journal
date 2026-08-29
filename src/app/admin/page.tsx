@@ -2,6 +2,7 @@
 // Force Rebuild
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import {
   SidebarProvider,
@@ -2384,7 +2385,11 @@ export default function MasterAdminDashboard() {
                   <TableBody>
                     {invoices.map((inv) => (
                       <TableRow key={inv.id}>
-                        <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          <Link href={`/invoice/${inv.id}`} target="_blank" className="text-primary underline underline-offset-2 hover:no-underline">
+                            {inv.invoiceNumber}
+                          </Link>
+                        </TableCell>
                         <TableCell className="text-xs">
                           {inv.advertiser.companyName}<br /><span className="text-muted-foreground">{inv.advertiser.user.email}</span>
                         </TableCell>

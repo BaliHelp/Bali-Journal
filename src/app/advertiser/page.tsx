@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -493,7 +494,11 @@ export default function AdvertiserDashboardPage() {
             <TableBody>
               {ads.filter((ad) => ad.invoice).map((ad) => (
                 <TableRow key={ad.invoice!.id}>
-                  <TableCell className="font-mono text-xs">{ad.invoice!.invoiceNumber}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    <Link href={`/invoice/${ad.invoice!.id}`} target="_blank" className="text-primary underline underline-offset-2 hover:no-underline">
+                      {ad.invoice!.invoiceNumber}
+                    </Link>
+                  </TableCell>
                   <TableCell>{formatRupiah(ad.invoice!.amount)}</TableCell>
                   <TableCell>
                     <Badge variant={ad.invoice!.status === 'PAID' ? 'default' : ad.invoice!.status === 'REJECTED' ? 'destructive' : 'secondary'}>
