@@ -11,12 +11,19 @@ export const registerSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter').optional(),
 })
 
-export const advertiserRegisterSchema = z.object({
+// Identity fields shared by both advertiser-registration paths.
+export const advertiserProfileSchema = z.object({
+  advertiserType: z.enum(['COMPANY', 'INDIVIDUAL']).default('COMPANY'),
+  companyName: z.string().min(2, 'Nama minimal 2 karakter').max(200),
+  phone: z.string().min(8, 'Nomor telepon minimal 8 digit').max(20),
+})
+
+// Full registration - only needed when there's no existing session (a
+// brand-new account must be created alongside the Advertiser profile).
+export const advertiserRegisterSchema = advertiserProfileSchema.extend({
   email: z.string().email('Email tidak valid'),
   password: z.string().min(6, 'Password minimal 6 karakter'),
   name: z.string().min(2, 'Nama minimal 2 karakter'),
-  companyName: z.string().min(2, 'Nama perusahaan minimal 2 karakter').max(200),
-  phone: z.string().min(8, 'Nomor telepon minimal 8 digit').max(20),
 })
 
 export const articleSchema = z.object({

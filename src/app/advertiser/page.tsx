@@ -64,7 +64,7 @@ const translations = {
     createAdFailed: 'Failed to create ad',
     uploadProofFailed: 'Failed to upload payment proof',
     pendingTitle: 'Awaiting Admin Approval',
-    pendingDesc: (name: string) => `Your advertiser account "${name}" is under review. You'll be able to place ads once approved.`,
+    pendingDesc: (name: string) => `Your advertiser account "${name}" is still under review, but you can place orders and pay right away - your first payment will be verified by admin.`,
     rejectedTitle: 'Registration Rejected',
     rejectedDefault: 'Your advertiser account was not approved.',
     dashboardTitle: 'Advertiser Dashboard',
@@ -106,7 +106,7 @@ const translations = {
     createAdFailed: 'Gagal membuat iklan',
     uploadProofFailed: 'Gagal upload bukti transfer',
     pendingTitle: 'Menunggu Persetujuan Admin',
-    pendingDesc: (name: string) => `Akun pengiklan "${name}" sedang ditinjau. Anda akan bisa memasang iklan setelah disetujui.`,
+    pendingDesc: (name: string) => `Akun pengiklan "${name}" masih ditinjau, tapi Anda tetap bisa memesan & membayar sekarang - pembayaran pertama Anda akan diverifikasi admin.`,
     rejectedTitle: 'Pendaftaran Ditolak',
     rejectedDefault: 'Akun pengiklan Anda tidak disetujui.',
     dashboardTitle: 'Dashboard Pengiklan',
@@ -199,9 +199,10 @@ export default function AdvertiserDashboardPage() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const res = await fetch('/api/auth/session')
-        const data = await res.json()
-        if (!res.ok || !data.user || data.user.role !== 'ADVERTISER') {
+        // Checks for an Advertiser profile directly (not session.role ===
+        // 'ADVERTISER') - any logged-in account can have one.
+        const res = await fetch('/api/advertiser/profile')
+        if (!res.ok) {
           router.push('/login')
           return
         }
@@ -221,7 +222,9 @@ export default function AdvertiserDashboardPage() {
       if (!profileRes.ok) throw new Error(profileData.error || t.loadProfileFailed)
       setProfile(profileData.advertiser)
 
-      if (profileData.advertiser?.status === 'APPROVED') {
+      // PENDING can place/pay for orders too now (see the alert banner
+      // below) - only a REJECTED account is fully shut out.
+      if (profileData.advertiser?.status !== 'REJECTED') {
         const [slotsRes, adsRes, paymentRes] = await Promise.all([
           fetch('/api/advertiser/slots'),
           fetch('/api/advertiser/ads'),
@@ -310,22 +313,6 @@ export default function AdvertiserDashboardPage() {
 
   if (!profile) return null
 
-  if (profile.status === 'PENDING') {
-    return (
-      <div className="container mx-auto max-w-2xl px-4 py-16">
-        <Card>
-          <CardHeader className="text-center">
-            <Clock className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-            <CardTitle>{t.pendingTitle}</CardTitle>
-            <CardDescription>
-              {t.pendingDesc(profile.companyName)}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    )
-  }
-
   if (profile.status === 'REJECTED') {
     return (
       <div className="container mx-auto max-w-2xl px-4 py-16">
@@ -352,6 +339,13 @@ export default function AdvertiserDashboardPage() {
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {profile.status === 'PENDING' && (
+        <Alert>
+          <Clock className="h-4 w-4" />
+          <AlertDescription>{t.pendingDesc(profile.companyName)}</AlertDescription>
         </Alert>
       )}
 

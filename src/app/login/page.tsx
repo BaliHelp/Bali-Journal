@@ -36,10 +36,12 @@ export default function LoginPage() {
         throw new Error(data.error || 'Login failed')
       }
 
-      // Redirect based on user role
+      // Redirect based on role first (editorial access takes priority), then
+      // whether this account also has an Advertiser profile - advertiser
+      // status is no longer tied to a dedicated 'ADVERTISER' role.
       if (data.user?.role === 'ADMIN' || data.user?.role === 'EDITOR') {
         router.push('/admin')
-      } else if (data.user?.role === 'ADVERTISER') {
+      } else if (data.advertiser) {
         router.push('/advertiser')
       } else {
         router.push('/')

@@ -60,6 +60,11 @@ export async function POST(request: NextRequest) {
     const token = await createSession(user.id)
     await setSessionCookie(token)
 
+    // "Is an advertiser" is a property of having an Advertiser profile, not
+    // the account's role - lets the login page route someone straight to
+    // /advertiser even if their primary role is USER/ADMIN/EDITOR.
+    const advertiser = await db.advertiser.findUnique({ where: { userId: user.id } })
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -67,6 +72,7 @@ export async function POST(request: NextRequest) {
         name: user.name,
         role: user.role,
       },
+      advertiser,
     })
   } catch (error) {
     console.error('Login error:', error)

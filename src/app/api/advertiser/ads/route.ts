@@ -25,9 +25,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (ctx.advertiser.status !== 'APPROVED') {
+  // Only a REJECTED account is blocked from ordering - PENDING is allowed so
+  // a brand-new self-service signup can place their first order immediately
+  // (nothing goes live until admin verifies the invoice payment anyway, so
+  // there's no risk in letting the order itself go through before review).
+  if (ctx.advertiser.status === 'REJECTED') {
     return NextResponse.json(
-      { error: 'Akun advertiser Anda belum disetujui admin' },
+      { error: 'Akun advertiser Anda ditolak. Hubungi admin untuk informasi lebih lanjut.' },
       { status: 403 }
     )
   }

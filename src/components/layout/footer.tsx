@@ -20,7 +20,7 @@ const footerLinks = {
       { href: '/transparency', label: 'Transparency' },
       { href: '/submit-report', label: 'Submit Report' },
       { href: '/contact', label: 'Contact' },
-      { href: '/advertiser/register', label: 'Advertise With Us' },
+      { href: '/ads', label: 'Advertise With Us' },
     ],
     legal: [
       { href: '/privacy-policy', label: 'Privacy Policy' },
@@ -43,7 +43,7 @@ const footerLinks = {
       { href: '/transparency', label: 'Transparansi' },
       { href: '/submit-report', label: 'Kirim Laporan' },
       { href: '/contact', label: 'Kontak' },
-      { href: '/advertiser/register', label: 'Pasang Iklan' },
+      { href: '/ads', label: 'Pasang Iklan' },
     ],
     legal: [
       { href: '/privacy-policy', label: 'Kebijakan Privasi' },

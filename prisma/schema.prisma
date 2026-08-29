@@ -346,10 +346,16 @@ enum AdvertiserStatus {
   REJECTED
 }
 
+enum AdvertiserType {
+  COMPANY
+  INDIVIDUAL
+}
+
 model Advertiser {
   id              String           @id @default(uuid())
   userId          String           @unique
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  advertiserType  AdvertiserType   @default(COMPANY)
   companyName     String
   phone           String
   status          AdvertiserStatus @default(PENDING)

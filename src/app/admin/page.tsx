@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { AD_POSITIONS } from '@/lib/ads/positions'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import {
   SidebarProvider,
@@ -132,23 +133,6 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 ]
 
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items)
-
-// Every position a slot can render at, with a human label + suggested IAB-ish
-// size so admin can tell at a glance which box on the site it maps to
-// (matches the boxes/labels on the homepage hero and article page rails).
-const AD_POSITIONS: { value: string; label: string; width: number; height: number }[] = [
-  { value: 'HEADER', label: 'Header (atas, di bawah menu)', width: 728, height: 90 },
-  { value: 'HOME_HERO_LEFT', label: 'Beranda - Rail Kiri Hero', width: 160, height: 600 },
-  { value: 'HOME_HERO_MINI', label: 'Beranda - Mini Box (bawah rail kiri)', width: 160, height: 160 },
-  { value: 'HOME_HERO_BELOW', label: 'Beranda - Banner Bawah Hero', width: 800, height: 150 },
-  { value: 'ARTICLE_LEFT', label: 'Artikel - Rail Kiri', width: 160, height: 600 },
-  { value: 'ARTICLE_LEFT_BOTTOM', label: 'Artikel - Rail Kiri Bawah', width: 160, height: 300 },
-  { value: 'ARTICLE_RIGHT_TOP', label: 'Artikel - Rail Kanan Atas', width: 300, height: 250 },
-  { value: 'ARTICLE_RIGHT_BOTTOM', label: 'Artikel - Rail Kanan Bawah', width: 300, height: 600 },
-  { value: 'IN_ARTICLE', label: 'Dalam Artikel (antar paragraf)', width: 336, height: 280 },
-  { value: 'MOBILE_BANNER', label: 'Mobile Banner', width: 320, height: 50 },
-  { value: 'FOOTER', label: 'Footer (bawah halaman)', width: 728, height: 90 },
-]
 
 const categories = [
   { value: 'TOURISM', label: 'Pariwisata' },

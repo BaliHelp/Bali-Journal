@@ -34,7 +34,7 @@ export function PlaceAdsCTA() {
           </div>
         </div>
         <Button asChild>
-          <Link href="/advertiser/register">{t.cta}</Link>
+          <Link href="/ads">{t.cta}</Link>
         </Button>
       </div>
     </section>
