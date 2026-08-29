@@ -333,6 +333,7 @@ export default function MasterAdminDashboard() {
   // Article form state
   const [articleForm, setArticleForm] = useState({
     title: '',
+    slug: '',
     excerpt: '',
     content: '',
     category: '',
@@ -341,6 +342,10 @@ export default function MasterAdminDashboard() {
     imageSource: '',
     status: 'DRAFT',
   })
+  // Once the admin manually edits the slug, stop auto-deriving it from the
+  // title (standard "slug follows title until touched" pattern).
+  const [slugTouched, setSlugTouched] = useState(false)
+  const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
   const [editingArticle, setEditingArticle] = useState<Article | null>(null)
   const [showArticleDialog, setShowArticleDialog] = useState(false)
   const [analyzingRisk, setAnalyzingRisk] = useState(false)
@@ -796,6 +801,7 @@ export default function MasterAdminDashboard() {
   function resetArticleForm() {
     setArticleForm({
       title: '',
+      slug: '',
       excerpt: '',
       content: '',
       category: '',
@@ -804,8 +810,35 @@ export default function MasterAdminDashboard() {
       imageSource: '',
       status: 'DRAFT',
     })
+    setSlugTouched(false)
     setRiskAnalysis(null)
     setAnalyzingRisk(false)
+  }
+
+  function slugify(text: string): string {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 150)
+  }
+
+  async function handleFeaturedImageUpload(file: File) {
+    setUploadingFeaturedImage(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('label', articleForm.title || 'article')
+      const res = await fetch('/api/admin/upload-image', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to upload image')
+      setArticleForm((f) => ({ ...f, featuredImageUrl: data.url, imageSource: f.imageSource || 'Manual Upload' }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload image')
+    } finally {
+      setUploadingFeaturedImage(false)
+    }
   }
 
   async function handleCreateArticle(e: React.FormEvent) {
@@ -991,6 +1024,7 @@ export default function MasterAdminDashboard() {
     setEditingArticle(article)
     setArticleForm({
       title: article.title,
+      slug: article.slug,
       excerpt: article.excerpt,
       content: article.content,
       category: article.category,
@@ -999,6 +1033,7 @@ export default function MasterAdminDashboard() {
       imageSource: article.imageSource || '',
       status: article.status,
     })
+    setSlugTouched(true) // an existing slug should never silently change just because the title is edited
     setShowArticleDialog(true)
   }
 
@@ -1314,38 +1349,64 @@ export default function MasterAdminDashboard() {
                           Fill in the article details. AI will analyze legal risk automatically.
                         </DialogDescription>
                       </DialogHeader>
-                      <form onSubmit={editingArticle ? handleUpdateArticle : handleCreateArticle} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-4">
+                      <form onSubmit={editingArticle ? handleUpdateArticle : handleCreateArticle} className="space-y-6">
+                        {/* Informasi Utama */}
+                        <div className="space-y-4">
+                          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informasi Utama</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor="title">Title *</Label>
+                              <Label htmlFor="title">Judul *</Label>
                               <Input
                                 id="title"
                                 value={articleForm.title}
-                                onChange={(e) => setArticleForm({ ...articleForm, title: e.target.value })}
-                                placeholder="Article title"
+                                onChange={(e) => {
+                                  const title = e.target.value
+                                  setArticleForm((f) => ({ ...f, title, slug: slugTouched ? f.slug : slugify(title) }))
+                                }}
+                                placeholder="Judul artikel"
                                 required
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="excerpt">Excerpt *</Label>
-                              <Textarea
-                                id="excerpt"
-                                value={articleForm.excerpt}
-                                onChange={(e) => setArticleForm({ ...articleForm, excerpt: e.target.value })}
-                                placeholder="Brief summary (50-300 chars)"
-                                rows={2}
+                              <Label htmlFor="slug">Slug (URL) *</Label>
+                              <Input
+                                id="slug"
+                                value={articleForm.slug}
+                                onChange={(e) => {
+                                  setSlugTouched(true)
+                                  setArticleForm({ ...articleForm, slug: e.target.value })
+                                }}
+                                placeholder="otomatis-dari-judul"
                                 required
                               />
+                              <p className="text-xs text-muted-foreground">
+                                Bagian URL artikel: balijournal.com/article/<span className="font-mono">{articleForm.slug || '...'}</span>. Terisi otomatis dari judul, bisa diubah manual.
+                              </p>
                             </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="excerpt">Excerpt (Ringkasan) *</Label>
+                            <Textarea
+                              id="excerpt"
+                              value={articleForm.excerpt}
+                              onChange={(e) => setArticleForm({ ...articleForm, excerpt: e.target.value })}
+                              placeholder="Ringkasan singkat (50-300 karakter)"
+                              rows={2}
+                              required
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Kutipan singkat yang tampil di kartu berita, hasil pencarian Google, dan preview link saat dibagikan - bukan isi lengkap artikel.
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor="category">Category *</Label>
+                              <Label htmlFor="category">Kategori *</Label>
                               <Select
                                 value={articleForm.category}
                                 onValueChange={(value) => setArticleForm({ ...articleForm, category: value })}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select category" />
+                                  <SelectValue placeholder="Pilih kategori" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {categories.map((cat) => (
@@ -1366,45 +1427,92 @@ export default function MasterAdminDashboard() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="DRAFT">Draft</SelectItem>
-                                  <SelectItem value="REVIEW">Review</SelectItem>
-                                  <SelectItem value="PUBLISHED">Published</SelectItem>
+                                  <SelectItem value="DRAFT">Draft - belum tayang, hanya admin yang lihat</SelectItem>
+                                  <SelectItem value="REVIEW">Review - menunggu review editor</SelectItem>
+                                  <SelectItem value="PUBLISHED">Published - langsung tayang di situs</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
                           </div>
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="featuredImageUrl">Image URL *</Label>
-                              <div className="relative">
-                                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  id="featuredImageUrl"
-                                  type="url"
-                                  value={articleForm.featuredImageUrl}
-                                  onChange={(e) => setArticleForm({ ...articleForm, featuredImageUrl: e.target.value })}
-                                  placeholder="https://example.com/image.jpg"
-                                  className="pl-10"
-                                />
+                        </div>
+
+                        {/* Gambar Utama */}
+                        <div className="space-y-4 border-t pt-4">
+                          <div>
+                            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Gambar Utama</h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Rekomendasi ukuran: <span className="font-medium text-foreground">1200×675px (rasio 16:9)</span> - gambar yang Anda upload otomatis dikonversi ke WebP (file kecil, tetap jernih).
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="featuredImageUrl">Image URL *</Label>
+                                <div className="relative">
+                                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                  <Input
+                                    id="featuredImageUrl"
+                                    type="text"
+                                    value={articleForm.featuredImageUrl}
+                                    onChange={(e) => setArticleForm({ ...articleForm, featuredImageUrl: e.target.value })}
+                                    placeholder="https://example.com/image.jpg"
+                                    className="pl-10"
+                                  />
+                                </div>
+                                <p className="text-xs text-muted-foreground">Tempel link gambar yang sudah ada, atau upload file di bawah ini.</p>
                               </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="featuredImageAlt">Image Alt Text *</Label>
-                              <Input
-                                id="featuredImageAlt"
-                                value={articleForm.featuredImageAlt}
-                                onChange={(e) => setArticleForm({ ...articleForm, featuredImageAlt: e.target.value })}
-                                placeholder="Describe the image"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="imageSource">Image Source *</Label>
-                              <Input
-                                id="imageSource"
-                                value={articleForm.imageSource}
-                                onChange={(e) => setArticleForm({ ...articleForm, imageSource: e.target.value })}
-                                placeholder="Photographer or source"
-                              />
+                              <div className="space-y-2">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  id="featured-image-upload"
+                                  disabled={uploadingFeaturedImage}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) handleFeaturedImageUpload(file)
+                                    e.target.value = ''
+                                  }}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={uploadingFeaturedImage}
+                                  onClick={() => document.getElementById('featured-image-upload')?.click()}
+                                >
+                                  {uploadingFeaturedImage ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <Upload className="h-4 w-4 mr-2" />
+                                  )}
+                                  Upload Gambar dari Komputer
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="featuredImageAlt">Image Alt Text *</Label>
+                                <Input
+                                  id="featuredImageAlt"
+                                  value={articleForm.featuredImageAlt}
+                                  onChange={(e) => setArticleForm({ ...articleForm, featuredImageAlt: e.target.value })}
+                                  placeholder="Deskripsikan isi gambar"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Teks deskripsi gambar untuk pembaca tunanetra (screen reader) dan SEO gambar - jelaskan apa yang terlihat di foto, bukan judul artikel.
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="imageSource">Image Source *</Label>
+                                <Input
+                                  id="imageSource"
+                                  value={articleForm.imageSource}
+                                  onChange={(e) => setArticleForm({ ...articleForm, imageSource: e.target.value })}
+                                  placeholder="Fotografer atau sumber"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Kredit/atribusi gambar yang tampil di caption bawah foto artikel, mis. nama fotografer, "AI-Generated Illustration", atau "Manual Upload".
+                                </p>
+                              </div>
                             </div>
                             {articleForm.featuredImageUrl && (
                               <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
@@ -1418,13 +1526,15 @@ export default function MasterAdminDashboard() {
                             )}
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="content">Content *</Label>
+
+                        {/* Konten */}
+                        <div className="space-y-2 border-t pt-4">
+                          <Label htmlFor="content">Content (Isi Artikel) *</Label>
                           <Textarea
                             id="content"
                             value={articleForm.content}
                             onChange={(e) => setArticleForm({ ...articleForm, content: e.target.value })}
-                            placeholder="Write your article content here... (HTML supported)"
+                            placeholder="Tulis isi artikel di sini... (mendukung HTML: <p>, <h3>, <ul>, <li>, dst.)"
                             rows={10}
                             required
                           />
@@ -1493,7 +1603,7 @@ export default function MasterAdminDashboard() {
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground border-t pt-4">
-                            Simpan artikel dulu untuk bisa upload foto.
+                            Foto tambahan di tengah/bawah isi artikel baru bisa diupload setelah artikel disimpan (buka lagi lewat tombol Edit) - upload gambar utama di atas sudah bisa dipakai sekarang.
                           </p>
                         )}
 

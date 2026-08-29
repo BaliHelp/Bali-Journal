@@ -7,7 +7,11 @@ import type { AdPositionValue } from '@/components/ads/ad-slot'
  * in sync in exactly one place.
  */
 export const AD_POSITIONS: { value: AdPositionValue; label: string; width: number; height: number }[] = [
-  { value: 'HEADER', label: 'Header (atas, di bawah menu)', width: 728, height: 90 },
+  // HEADER intentionally omitted - the banner slot below the nav was
+  // removed from every page (see layout.tsx), so it's no longer offered
+  // for sale here. The one pre-existing HEADER AdSlot row was left in the
+  // database (harmless, unused) but had its pricePerDay cleared so it
+  // no longer appears on /ads or the advertiser self-service slot list.
   { value: 'HOME_HERO_LEFT', label: 'Beranda - Rail Kiri Hero', width: 160, height: 600 },
   { value: 'HOME_HERO_MINI', label: 'Beranda - Mini Box (bawah rail kiri)', width: 160, height: 160 },
   { value: 'HOME_HERO_BELOW', label: 'Beranda - Banner Bawah Hero', width: 800, height: 150 },

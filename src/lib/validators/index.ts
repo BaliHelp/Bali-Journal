@@ -30,10 +30,28 @@ export const articleSchema = z.object({
   title: z.string().min(10, 'Judul minimal 10 karakter').max(200, 'Judul maksimal 200 karakter'),
   excerpt: z.string().min(50, 'Ringkasan minimal 50 karakter').max(300, 'Ringkasan maksimal 300 karakter'),
   content: z.string().min(200, 'Konten minimal 200 karakter'),
-  category: z.enum(['TOURISM', 'INVESTMENT', 'INCIDENTS', 'LOCAL', 'JOBS', 'OPINION']),
-  featuredImageUrl: z.string().url('URL gambar tidak valid').optional().nullable(),
+  // GOVERNMENT was missing here even though the admin category dropdown and
+  // every AI generator already offer/produce it - selecting it in the
+  // Create Article form silently failed this validation.
+  category: z.enum(['TOURISM', 'GOVERNMENT', 'INVESTMENT', 'INCIDENTS', 'LOCAL', 'JOBS', 'OPINION']),
+  // Accepts either a full external URL or a local upload path (starts with
+  // "/", e.g. "/uploads/articles/foo.webp" from the upload button) - a plain
+  // .url() check rejects relative paths, which is exactly what local
+  // uploads and every AI-generated image already store in this field.
+  featuredImageUrl: z
+    .string()
+    .refine((v) => v.startsWith('/') || z.string().url().safeParse(v).success, 'URL gambar tidak valid')
+    .optional()
+    .nullable(),
   featuredImageAlt: z.string().min(10, 'Alt text minimal 10 karakter').optional().nullable(),
   imageSource: z.string().min(5, 'Sumber gambar harus diisi').optional().nullable(),
+  slug: z
+    .string()
+    .min(3, 'Slug minimal 3 karakter')
+    .max(150, 'Slug maksimal 150 karakter')
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Slug hanya boleh huruf kecil, angka, dan tanda hubung (-)')
+    .optional()
+    .nullable(),
 })
 
 export const commentSchema = z.object({

@@ -50,6 +50,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const { id } = await params
     const body = await request.json()
 
+    // Slug is optional and admin-editable here - sanitized the same way as
+    // on create, but NOT auto-generated from the title (an edit shouldn't
+    // silently change a published article's URL unless the admin explicitly
+    // typed a new slug). A collision with another article's slug surfaces
+    // as the unique-constraint error below rather than being auto-resolved.
+    const slug = body.slug
+      ? body.slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 150)
+      : undefined
+
     const article = await db.article.update({
       where: { id },
       data: {
@@ -61,6 +70,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
         featuredImageAlt: body.featuredImageAlt,
         imageSource: body.imageSource,
         status: body.status,
+        ...(slug ? { slug } : {}),
       },
     })
 

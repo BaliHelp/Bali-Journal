@@ -55,10 +55,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { title, excerpt, content, category, featuredImageUrl, featuredImageAlt, imageSource } = result.data
+    const { title, excerpt, content, category, featuredImageUrl, featuredImageAlt, imageSource, slug: slugOverride } = result.data
 
-    // Generate slug
-    const baseSlug = title
+    // Use the admin's slug if they set one, otherwise derive it from the title.
+    const baseSlug = (slugOverride || title)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
