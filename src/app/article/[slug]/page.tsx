@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { db } from '@/lib/db'
 import { notFound } from 'next/navigation'
 
@@ -31,7 +32,15 @@ interface ArticlePageProps {
   params: Promise<{ slug: string }>
 }
 
-async function getArticle(slug: string) {
+// Wrapped in React's cache() - this is called once from generateMetadata()
+// and again from the page component itself, and Next.js dev mode
+// additionally double-invokes Server Components. Without request-level
+// memoization each real page view could trigger this query 2-4x, and under
+// this project's connection_limit=1 pooled connection, independent runs
+// occasionally raced and returned inconsistent results between passes -
+// the same root cause already found and patched around (in a narrower,
+// ad-rail-only way) by the comment near the ad rail JSX below.
+const getArticle = cache(async (slug: string) => {
   return db.article.findUnique({
     where: { slug, status: 'PUBLISHED' },
     include: {
@@ -47,7 +56,7 @@ async function getArticle(slug: string) {
       },
     },
   })
-}
+})
 
 async function incrementViewCount(articleId: string) {
   await db.article.update({
@@ -64,7 +73,7 @@ const ALL_CATEGORIES: Category[] = ['TOURISM', 'GOVERNMENT', 'INVESTMENT', 'INCI
  * site instead of getting stuck in one topic. Skips a category entirely if
  * it has no published article yet, rather than showing a broken/empty card.
  */
-async function getOtherCategoryArticles(excludeId: string, excludeCategory: Category) {
+const getOtherCategoryArticles = cache(async (excludeId: string, excludeCategory: Category) => {
   const otherCategories = ALL_CATEGORIES.filter((c) => c !== excludeCategory)
 
   const results = await Promise.all(
@@ -82,7 +91,7 @@ async function getOtherCategoryArticles(excludeId: string, excludeCategory: Cate
   )
 
   return results.filter((a): a is NonNullable<typeof a> => a !== null)
-}
+})
 
 const riskLevelColors: Record<string, string> = {
   LOW: 'bg-green-500',

@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { db } from '@/lib/db'
 import { ArticleCard } from '@/components/article/article-card'
 import { CategorySection } from '@/components/article/category-section'
@@ -10,7 +11,15 @@ import { AdSlot, AdMedia, getActiveAd } from '@/components/ads/ad-slot'
 
 export const revalidate = 60 // ISR: 60 seconds
 
-async function getLatestArticles() {
+// Wrapped in React's cache() so these only hit the DB once per request even
+// though Next.js dev mode double-invokes Server Components - without this,
+// the 10 queries below (Promise.all) each ran twice per page load, and
+// under this project's connection_limit=1 pooled connection, the two
+// independent runs of e.g. getActiveAd() could occasionally race and
+// return different results between the two invocations, producing a real
+// (if intermittent) hydration mismatch - confirmed by reproducing it
+// ~1-in-5 to 1-in-20 loads even with completely static underlying data.
+const getLatestArticles = cache(async () => {
   return db.article.findMany({
     where: { status: 'PUBLISHED' },
     orderBy: { publishedAt: 'desc' },
@@ -19,9 +28,9 @@ async function getLatestArticles() {
       author: { select: { name: true } },
     },
   })
-}
+})
 
-async function getFeaturedArticle() {
+const getFeaturedArticle = cache(async () => {
   return db.article.findFirst({
     where: {
       status: 'PUBLISHED',
@@ -35,9 +44,9 @@ async function getFeaturedArticle() {
       author: { select: { name: true } },
     },
   })
-}
+})
 
-async function getArticlesByCategory(category: string) {
+const getArticlesByCategory = cache(async (category: string) => {
   return db.article.findMany({
     where: {
       status: 'PUBLISHED',
@@ -49,13 +58,13 @@ async function getArticlesByCategory(category: string) {
       author: { select: { name: true } },
     },
   })
-}
+})
 
-async function getPublishedCount() {
+const getPublishedCount = cache(async () => {
   return db.article.count({
     where: { status: 'PUBLISHED' }
   })
-}
+})
 
 export default async function HomePage() {
   const [

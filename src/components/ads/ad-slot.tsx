@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { db } from '@/lib/db'
 import type { Ad, AdSlot as AdSlotModel } from '@prisma/client'
 
@@ -41,14 +42,24 @@ export const DEVICE_CLASS: Record<AdDeviceValue, string> = {
  * column when there's actually something to show in it, instead of leaving
  * a blank box (mirrors the DEVICE_CLASS split: DESKTOP/MOBILE must be
  * queried separately since a slot can have ads for one but not the other).
+ *
+ * Wrapped in React's cache() - a page can call this (directly or via
+ * getActiveAds) for the SAME position/device from multiple places in one
+ * render (a presence-check plus the actual render), and Next.js dev mode
+ * additionally double-invokes Server Components as a validation check. Both
+ * of those mean this can genuinely run twice per request; without cache(),
+ * two independent DB round-trips for "the same" query - under this
+ * project's connection_limit=1 pooled connection - could occasionally race
+ * and return different results, producing a real (if intermittent)
+ * hydration mismatch where one pass sees an ad and the other doesn't.
  */
-export async function getActiveAd(position: AdPositionValue, device: AdDeviceValue = 'BOTH'): Promise<AdWithSlot | null> {
+export const getActiveAd = cache(async (position: AdPositionValue, device: AdDeviceValue = 'BOTH'): Promise<AdWithSlot | null> => {
   const ads = await getActiveAds(position, device, 1)
   return ads[0] ?? null
-}
+})
 
 /** Same query as getActiveAd but returns up to `limit` ads - used by RotatingAdSlot to decide whether a position needs a carousel. */
-export async function getActiveAds(position: AdPositionValue, device: AdDeviceValue = 'BOTH', limit = 5): Promise<AdWithSlot[]> {
+export const getActiveAds = cache(async (position: AdPositionValue, device: AdDeviceValue = 'BOTH', limit = 5): Promise<AdWithSlot[]> => {
   const now = new Date()
   return db.ad.findMany({
     where: {
@@ -61,7 +72,7 @@ export async function getActiveAds(position: AdPositionValue, device: AdDeviceVa
     orderBy: { createdAt: 'desc' },
     take: limit,
   })
-}
+})
 
 /** Renders one ad's creative (image/video) wrapped in its click-through link, if any. Shared by AdSlot (single) and AdCarousel (rotating). */
 export function AdMedia({ ad, fill = false }: { ad: AdWithSlot; fill?: boolean }) {
