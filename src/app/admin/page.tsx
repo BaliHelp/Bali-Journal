@@ -61,6 +61,7 @@ import {
   MessageCircle,
   Shield,
   ShieldAlert,
+  KeyRound,
   BarChart3,
   Settings,
   Search,
@@ -1216,6 +1217,34 @@ export default function MasterAdminDashboard() {
     router.push('/login')
   }
 
+  const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError('Konfirmasi password baru tidak cocok')
+      return
+    }
+    try {
+      const res = await fetch('/api/admin/change-password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Gagal mengganti password')
+      setSuccess('Password berhasil diganti!')
+      setShowChangePasswordDialog(false)
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengganti password')
+    }
+  }
+
 
   async function handleRepairImage(id: string, title: string) {
     if (!confirm(`Regenerate image for "${title}"? This will replace the current image.`)) return
@@ -1309,6 +1338,12 @@ export default function MasterAdminDashboard() {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
+              <SidebarMenuButton onClick={() => setShowChangePasswordDialog(true)} tooltip="Ganti Password">
+                <KeyRound />
+                <span>Ganti Password</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="View Site">
                 <a href="/" target="_blank" rel="noopener noreferrer">
                   <LinkIcon />
@@ -1324,6 +1359,62 @@ export default function MasterAdminDashboard() {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
+
+        <Dialog open={showChangePasswordDialog} onOpenChange={setShowChangePasswordDialog}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Ganti Password</DialogTitle>
+              <DialogDescription>Ganti password login akun kamu.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Password Saat Ini</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Password Baru</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">Minimal 8 karakter.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Konfirmasi Password Baru</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  required
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowChangePasswordDialog(false)}>
+                  Batal
+                </Button>
+                <Button type="submit">
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  Ganti Password
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </Sidebar>
 
       <SidebarInset>

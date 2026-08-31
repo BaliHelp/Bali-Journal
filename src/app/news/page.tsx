@@ -16,6 +16,9 @@ import {
 export const metadata = {
   title: 'All News - Bali Journal',
   description: 'Browse every published article on Bali Journal, filterable by category.',
+  alternates: {
+    canonical: '/news',
+  },
 }
 
 const PAGE_SIZE = 20

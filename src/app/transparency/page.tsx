@@ -4,6 +4,14 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Shield, FileText, Users, Eye, CheckCircle, AlertTriangle } from 'lucide-react'
 
+export const metadata = {
+  title: 'Transparency - Bali Journal',
+  description: 'Bali Journal\'s transparency report - editorial stats and accountability.',
+  alternates: {
+    canonical: '/transparency',
+  },
+}
+
 async function getStats() {
   const [totalArticles, publishedArticles, totalComments, totalUsers] = await Promise.all([
     db.article.count(),

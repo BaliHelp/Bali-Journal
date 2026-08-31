@@ -4,6 +4,12 @@ import { Search as SearchIcon } from 'lucide-react'
 
 export const metadata = {
   title: 'Search - Bali Journal',
+  // Every ?q= variant canonicalizes to the bare /search page - individual
+  // search-result URLs are thin/duplicate content and shouldn't compete
+  // with real article pages in the index.
+  alternates: {
+    canonical: '/search',
+  },
 }
 
 interface SearchPageProps {

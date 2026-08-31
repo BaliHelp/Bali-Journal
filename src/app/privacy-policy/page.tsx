@@ -2,7 +2,10 @@ import { Metadata } from 'next'
 
 export const metadata: Metadata = {
     title: 'Privacy Policy - Bali Journal',
-    description: 'Privacy Policy for Bali Journal.'
+    description: 'Privacy Policy for Bali Journal.',
+    alternates: {
+        canonical: '/privacy-policy',
+    },
 }
 
 export default function PrivacyPolicyPage() {

@@ -23,6 +23,15 @@ export const metadata: Metadata = {
   },
   description: 'Bali\'s premier independent investigative journalism platform. Delivering evidence-based news on Tourism, Investment, Incidents, and Local affairs in Bali, Indonesia.',
   keywords: ['Bali news', 'Investigative Journalism', 'Bali Tourism', 'Bali Investment', 'Canggu News', 'Bali Safety', 'Travel Advice Bali', 'Bali Journal'],
+  // Root-level default: the homepage's own canonical. Every other route
+  // (article, category, /news, /search, static pages) sets its own
+  // canonical below/in its own metadata - without an explicit canonical
+  // per page, Next.js doesn't emit one at all, and www vs. non-www /
+  // trailing-slash variants would otherwise be seen by Google as separate
+  // duplicate URLs instead of consolidating signals onto www.balijournal.com.
+  alternates: {
+    canonical: '/',
+  },
   authors: [{ name: 'Bali Journal Team' }],
   creator: 'Bali Journal Media',
   publisher: 'Bali Journal Media',

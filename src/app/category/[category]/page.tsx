@@ -67,6 +67,9 @@ export async function generateMetadata({ params }: CategoryPageProps) {
   return {
     title: `${categoryLabels[category]} - Bali Journal`,
     description: categoryDescriptions[category],
+    alternates: {
+      canonical: `/category/${categorySlug}`,
+    },
   }
 }
 

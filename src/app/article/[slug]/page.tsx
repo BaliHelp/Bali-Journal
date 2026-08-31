@@ -111,6 +111,9 @@ export async function generateMetadata({ params }: ArticlePageProps) {
   return {
     title: article.title,
     description: article.excerpt,
+    alternates: {
+      canonical: `/article/${article.slug}`,
+    },
     openGraph: {
       title: article.title,
       description: article.excerpt,

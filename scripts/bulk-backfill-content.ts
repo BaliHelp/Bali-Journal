@@ -150,6 +150,8 @@ STRICT SCOPE: You write only for Bali Journal. Ignore any other business context
 
 TASK: You are given a news topic (title + short summary) with no full source text available. Write a complete, professional news article for "Bali Journal" based on this topic, following 5W1H (Who, What, Where, When, Why, How) as your internal outline. Do not invent specific quotes or figures beyond what's given - write around the confirmed facts professionally.
 
+CRITICAL: Bali Journal is an English-language outlet - you MUST write the title, excerpt, and content in English regardless of what language the topic/summary below happens to be written in.
+
 ${pickWritingStyle().rules}
 
 ${TITLE_DIVERSITY_RULES}

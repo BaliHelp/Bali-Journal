@@ -2,7 +2,10 @@ import { Metadata } from 'next'
 
 export const metadata: Metadata = {
     title: 'Editorial Guidelines - Bali Journal',
-    description: 'Editorial Guidelines and Ethics for Bali Journal.'
+    description: 'Editorial Guidelines and Ethics for Bali Journal.',
+    alternates: {
+        canonical: '/editorial-guidelines',
+    },
 }
 
 export default function EditorialGuidelinesPage() {

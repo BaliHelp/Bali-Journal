@@ -2,7 +2,10 @@ import { Metadata } from 'next'
 
 export const metadata: Metadata = {
     title: 'Terms & Conditions - Bali Journal',
-    description: 'Terms and Conditions for using Bali Journal.'
+    description: 'Terms and Conditions for using Bali Journal.',
+    alternates: {
+        canonical: '/terms-conditions',
+    },
 }
 
 export default function TermsConditionsPage() {

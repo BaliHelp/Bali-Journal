@@ -5,6 +5,14 @@ import { Separator } from '@/components/ui/separator'
 import { Shield, Users, FileText, Target, Eye, Heart } from 'lucide-react'
 import Link from 'next/link'
 
+export const metadata = {
+  title: 'About Us - Bali Journal',
+  description: 'Learn about Bali Journal\'s mission, team, and editorial standards.',
+  alternates: {
+    canonical: '/about',
+  },
+}
+
 const teamMembers = [
   { name: 'Investigation Team', role: 'Investigative Journalists', count: 5 },
   { name: 'Editorial Team', role: 'Senior Editors', count: 3 },
