@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Loader2, Sparkles, Activity, Brain, FileText, Zap } from 'lucide-react'
+import { Loader2, Sparkles, Activity, Brain, FileText, Zap, CheckCircle2 } from 'lucide-react'
 import {
     Select,
     SelectContent,
@@ -25,6 +25,7 @@ export function AiControls({ onSuccess, onError, onRefresh }: AiControlsProps) {
     const [articleCount, setArticleCount] = useState('3')
     const [viralCategory, setViralCategory] = useState('random')
     const [rewriteUrl, setRewriteUrl] = useState('')
+    const [rewriteProgress, setRewriteProgress] = useState<string[]>([])
     const [rawData, setRawData] = useState('')
 
     // Auto-publish state
@@ -134,6 +135,7 @@ export function AiControls({ onSuccess, onError, onRefresh }: AiControlsProps) {
             return
         }
         setLoading(true)
+        setRewriteProgress([])
         try {
             const res = await fetch('/api/ai/rewrite-news', {
                 method: 'POST',
@@ -143,13 +145,45 @@ export function AiControls({ onSuccess, onError, onRefresh }: AiControlsProps) {
                     autoPublish // Use the state variable
                 })
             })
-            const data = await res.json()
-            if (res.ok) {
-                onSuccess(`✅ Article rewritten successfully!`)
-                onRefresh()
-                setRewriteUrl('')
-            } else {
+
+            if (!res.ok || !res.body) {
+                const data = await res.json().catch(() => ({}))
                 onError(data.error || 'Failed to rewrite article')
+                return
+            }
+
+            // Parse the Server-Sent Events stream as it arrives - each
+            // "progress" event is one real pipeline checkpoint (fetch done,
+            // AI rewrite done, image generated, saved), not a simulated timer.
+            const reader = res.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                buffer += decoder.decode(value, { stream: true })
+
+                const events = buffer.split('\n\n')
+                buffer = events.pop() || ''
+
+                for (const raw of events) {
+                    if (!raw.trim()) continue
+                    const eventType = raw.match(/^event: (.+)$/m)?.[1]?.trim() || 'message'
+                    const dataLine = raw.match(/^data: (.+)$/m)?.[1]?.trim()
+                    if (!dataLine) continue
+                    const data = JSON.parse(dataLine)
+
+                    if (eventType === 'progress') {
+                        setRewriteProgress((prev) => [...prev, data.stage])
+                    } else if (eventType === 'done') {
+                        onSuccess(`✅ Article rewritten successfully!`)
+                        onRefresh()
+                        setRewriteUrl('')
+                    } else if (eventType === 'error') {
+                        onError(data.error || 'Failed to rewrite article')
+                    }
+                }
             }
         } catch (err) {
             onError('Failed to rewrite article')
@@ -349,6 +383,25 @@ export function AiControls({ onSuccess, onError, onRefresh }: AiControlsProps) {
                         Rewrite
                     </Button>
                 </div>
+
+                {/* Live progress - one line per real pipeline checkpoint, streamed
+                    via Server-Sent Events as each step actually completes. */}
+                {rewriteProgress.length > 0 && (
+                    <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5 text-sm">
+                        {rewriteProgress.map((stage, i) => (
+                            <div key={i} className="flex items-center gap-2 text-foreground">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                                <span>{stage}</span>
+                            </div>
+                        ))}
+                        {loading && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                                <span>Memproses...</span>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Repair Tools */}

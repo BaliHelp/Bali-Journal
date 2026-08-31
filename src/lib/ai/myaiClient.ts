@@ -102,7 +102,12 @@ export async function myaiComplete(field: MyaiField, messages: MyaiMessage[], mo
     })
 
     if (!res.ok) {
-        throw new Error(`MyAI OS request failed (${res.status}): ${await res.text()}`)
+        // Cap the body - a gateway-level failure (WAF block, outage page, proxy
+        // error) can return a full HTML page instead of JSON, and that raw
+        // page used to end up verbatim in this Error's message, which then
+        // surfaced as-is in admin UI error banners and blew up the layout.
+        const body = (await res.text()).slice(0, 300)
+        throw new Error(`MyAI OS request failed (${res.status}): ${body}`)
     }
 
     const data: MyaiResponse = await res.json()

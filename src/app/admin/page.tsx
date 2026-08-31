@@ -1167,7 +1167,7 @@ export default function MasterAdminDashboard() {
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="max-h-40 overflow-y-auto break-words">{error}</AlertDescription>
           </Alert>
         )}
 

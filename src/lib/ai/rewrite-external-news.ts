@@ -16,6 +16,8 @@ export interface RewriteExternalNewsInput {
     publishedAtOverride?: Date
     /** Widen the image generator rotation for this call only - see generateAndStoreImage()'s `pool` param. */
     imagePool?: GeneratorStrategy[]
+    /** Called at each real pipeline checkpoint (not simulated timing) - lets a caller stream live progress to a UI. Optional and side-effect-free if omitted. */
+    onProgress?: (stage: string) => void
 }
 
 export interface RewriteExternalNewsResult {
@@ -31,12 +33,13 @@ export interface RewriteExternalNewsResult {
  * both go through identical AI-calling logic instead of it living twice.
  */
 export async function rewriteExternalNewsToArticle(input: RewriteExternalNewsInput): Promise<RewriteExternalNewsResult> {
-    const { url, status, publishedAtOverride, imagePool } = input
+    const { url, status, publishedAtOverride, imagePool, onProgress } = input
     const category: Category = input.category || 'LOCAL'
 
     // 1. Fetch external content - plain server-side fetch, no browser
     // rendering and no vision model involved. JS-heavy sites that render
     // their article body client-side won't extract cleanly this way.
+    onProgress?.('Membaca link sumber...')
     const res = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BaliJournalBot/1.0)' },
         signal: AbortSignal.timeout(20_000),
@@ -57,8 +60,10 @@ export async function rewriteExternalNewsToArticle(input: RewriteExternalNewsInp
         ;(err as Error & { status?: number }).status = 422
         throw err
     }
+    onProgress?.('Mengambil garis besar berita...')
 
     // 2. AI rewrites it
+    onProgress?.('Membuat berita baru...')
     const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>('chatbot', [
         {
             role: 'system', content: `${AGENT_PERSONAS.WIE.instructions}
@@ -87,6 +92,7 @@ else - no commentary before or after:
     if (!articleData.title) {
         throw new Error('AI response did not include a title - the model deviated from the requested JSON schema. Try again.')
     }
+    onProgress?.('Artikel telah dikerjakan...')
 
     // 3. Generate image (verified binary, stored locally - stable URL forever)
     const storedImage = await generateAndStoreImage(
@@ -95,6 +101,7 @@ else - no commentary before or after:
         { category, excerpt: articleData.excerpt, content: articleData.content },
         imagePool
     )
+    onProgress?.('Foto telah digenerate...')
 
     // 4. Save
     const slug = articleData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.random().toString(36).substring(7)
@@ -132,6 +139,8 @@ else - no commentary before or after:
             metadata: { originalUrl: url },
         },
     })
+
+    onProgress?.(status === 'PUBLISHED' ? 'Artikel telah dipublikasikan!' : 'Artikel tersimpan sebagai draft!')
 
     return { article, imageSource: storedImage.source }
 }
