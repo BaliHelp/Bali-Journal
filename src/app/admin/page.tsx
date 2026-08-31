@@ -26,7 +26,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useToast } from '@/hooks/use-toast'
+import { AsyncButton } from '@/components/ui/async-button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
@@ -347,8 +348,20 @@ export default function MasterAdminDashboard() {
 
   // UI states
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const { toast } = useToast()
+  // Kept as functions (not state) so the ~50 existing setError()/setSuccess()
+  // call sites across this file didn't need touching - they now surface as
+  // global top-center toasts instead of an inline banner that could scroll
+  // out of view.
+  function setError(message: string | null) {
+    if (message) toast({ title: 'Gagal', description: message, variant: 'destructive' })
+  }
+  function setSuccess(message: string | null) {
+    if (message) toast({ title: 'Berhasil', description: message })
+  }
+  // Shared submit-loading flag for the ad slot/ad create/update dialogs -
+  // only one of these dialogs can be open at a time, so one flag is enough.
+  const [formSubmitting, setFormSubmitting] = useState(false)
 
   // Article form state
   const [articleForm, setArticleForm] = useState({
@@ -425,6 +438,7 @@ export default function MasterAdminDashboard() {
   async function handleCreateAdSlot(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setFormSubmitting(true)
     try {
       const res = await fetch('/api/admin/ad-slots', {
         method: 'POST',
@@ -439,6 +453,8 @@ export default function MasterAdminDashboard() {
       fetchAdsData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create ad slot')
+    } finally {
+      setFormSubmitting(false)
     }
   }
 
@@ -487,6 +503,7 @@ export default function MasterAdminDashboard() {
       setError('Pilih file gambar/video dulu')
       return
     }
+    setFormSubmitting(true)
     try {
       const formData = new FormData()
       formData.append('slotId', adForm.slotId)
@@ -511,6 +528,8 @@ export default function MasterAdminDashboard() {
       fetchAdsData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create ad')
+    } finally {
+      setFormSubmitting(false)
     }
   }
 
@@ -562,6 +581,7 @@ export default function MasterAdminDashboard() {
     e.preventDefault()
     if (!editingAdId) return
     setError(null)
+    setFormSubmitting(true)
     try {
       const formData = new FormData()
       formData.append('advertiserName', editAdForm.advertiserName)
@@ -580,6 +600,8 @@ export default function MasterAdminDashboard() {
       fetchAdsData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update ad')
+    } finally {
+      setFormSubmitting(false)
     }
   }
 
@@ -1183,9 +1205,6 @@ export default function MasterAdminDashboard() {
   async function handleRepairImage(id: string, title: string) {
     if (!confirm(`Regenerate image for "${title}"? This will replace the current image.`)) return
 
-    // Optimistic UI or Loading state could be added here
-    setSuccess(`Repairing image for "${title}"...`)
-
     try {
       const res = await fetch(`/api/articles/${id}/repair`, { method: 'POST' })
       const data = await res.json()
@@ -1294,20 +1313,6 @@ export default function MasterAdminDashboard() {
       </header>
 
       <main className="px-4 py-6 md:px-6">
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="max-h-40 overflow-y-auto break-words">{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert className="mb-6 border-green-200 bg-green-50 text-green-800">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
-
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
 
           <TabsContent value="overview">
@@ -2001,7 +2006,7 @@ export default function MasterAdminDashboard() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
-                              <Button
+                              <AsyncButton
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleRepairImage(article.id, article.title)}
@@ -2009,22 +2014,24 @@ export default function MasterAdminDashboard() {
                                 className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                               >
                                 <RefreshCw className="h-4 w-4" />
-                              </Button>
+                              </AsyncButton>
                               <Button variant="ghost" size="icon" onClick={() => openEditArticle(article)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
                               {article.status !== 'PUBLISHED' ? (
-                                <Button variant="ghost" size="icon" onClick={() => handlePublishArticle(article.id)}>
+                                <AsyncButton variant="ghost" size="icon" onClick={() => handlePublishArticle(article.id)} title="Publish">
                                   <Send className="h-4 w-4 text-green-500" />
-                                </Button>
+                                </AsyncButton>
                               ) : (
-                                <Button variant="ghost" size="icon" onClick={() => handlePublishArticle(article.id)}>
-                                  <Eye className="h-4 w-4" />
+                                <Button variant="ghost" size="icon" asChild title="View live article">
+                                  <a href={`/article/${article.slug}`} target="_blank" rel="noopener noreferrer">
+                                    <Eye className="h-4 w-4" />
+                                  </a>
                                 </Button>
                               )}
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteArticle(article.id)}>
+                              <AsyncButton variant="ghost" size="icon" onClick={() => handleDeleteArticle(article.id)}>
                                 <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
+                              </AsyncButton>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -2112,12 +2119,12 @@ export default function MasterAdminDashboard() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
-                              <Button size="icon" variant="ghost" onClick={() => handleCommentAction(comment.id, 'approve')}>
+                              <AsyncButton size="icon" variant="ghost" onClick={() => handleCommentAction(comment.id, 'approve')}>
                                 <CheckCircle className="h-4 w-4 text-green-500" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => handleCommentAction(comment.id, 'reject')}>
+                              </AsyncButton>
+                              <AsyncButton size="icon" variant="ghost" onClick={() => handleCommentAction(comment.id, 'reject')}>
                                 <XCircle className="h-4 w-4 text-red-500" />
-                              </Button>
+                              </AsyncButton>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -2321,7 +2328,10 @@ export default function MasterAdminDashboard() {
                             Standar IAB: Leaderboard 728x90, Medium Rectangle 300x250, Mobile Banner 320x50.
                           </p>
                           <DialogFooter>
-                            <Button type="submit">Save Slot</Button>
+                            <Button type="submit" disabled={formSubmitting}>
+                              {formSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Save Slot
+                            </Button>
                           </DialogFooter>
                         </form>
                       </DialogContent>
@@ -2357,9 +2367,9 @@ export default function MasterAdminDashboard() {
                           </TableCell>
                           <TableCell>{s.ads.filter((a) => a.isActive).length}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteAdSlot(s.id)}>
+                            <AsyncButton variant="ghost" size="icon" onClick={() => handleDeleteAdSlot(s.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            </AsyncButton>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -2496,7 +2506,10 @@ export default function MasterAdminDashboard() {
                             />
                           </div>
                           <DialogFooter>
-                            <Button type="submit">Save Ad</Button>
+                            <Button type="submit" disabled={formSubmitting}>
+                              {formSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Save Ad
+                            </Button>
                           </DialogFooter>
                         </form>
                       </DialogContent>
@@ -2555,9 +2568,9 @@ export default function MasterAdminDashboard() {
                             <Button variant="ghost" size="icon" onClick={() => openEditAd(ad)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteAd(ad.id)}>
+                            <AsyncButton variant="ghost" size="icon" onClick={() => handleDeleteAd(ad.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            </AsyncButton>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -2636,7 +2649,10 @@ export default function MasterAdminDashboard() {
                       <Label htmlFor="edit-ad-active" className="cursor-pointer">Aktif (tayang di situs)</Label>
                     </div>
                     <DialogFooter>
-                      <Button type="submit">Simpan Perubahan</Button>
+                      <Button type="submit" disabled={formSubmitting}>
+                        {formSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Simpan Perubahan
+                      </Button>
                     </DialogFooter>
                   </form>
                 </DialogContent>
@@ -2752,10 +2768,10 @@ export default function MasterAdminDashboard() {
                         </TableCell>
                         <TableCell className="text-right space-x-2">
                           {a.status !== 'APPROVED' && (
-                            <Button size="sm" onClick={() => handleApproveAdvertiser(a.id)}>Approve</Button>
+                            <AsyncButton size="sm" onClick={() => handleApproveAdvertiser(a.id)}>Approve</AsyncButton>
                           )}
                           {a.status !== 'REJECTED' && (
-                            <Button size="sm" variant="outline" onClick={() => handleRejectAdvertiser(a.id)}>Reject</Button>
+                            <AsyncButton size="sm" variant="outline" onClick={() => handleRejectAdvertiser(a.id)}>Reject</AsyncButton>
                           )}
                         </TableCell>
                       </TableRow>
@@ -2824,8 +2840,8 @@ export default function MasterAdminDashboard() {
                         <TableCell className="text-right space-x-2">
                           {inv.status === 'VERIFYING' && (
                             <>
-                              <Button size="sm" onClick={() => handleVerifyInvoicePaid(inv.id)}>Verifikasi Lunas</Button>
-                              <Button size="sm" variant="outline" onClick={() => handleRejectInvoice(inv.id)}>Tolak</Button>
+                              <AsyncButton size="sm" onClick={() => handleVerifyInvoicePaid(inv.id)}>Verifikasi Lunas</AsyncButton>
+                              <AsyncButton size="sm" variant="outline" onClick={() => handleRejectInvoice(inv.id)}>Tolak</AsyncButton>
                             </>
                           )}
                         </TableCell>

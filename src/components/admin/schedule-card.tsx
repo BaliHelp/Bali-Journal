@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { AsyncButton } from '@/components/ui/async-button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useToast } from '@/hooks/use-toast'
 import { BarChart3, Plus, Edit, Trash2, Save, X } from 'lucide-react'
 
 interface Schedule {
@@ -19,6 +21,7 @@ interface Schedule {
 }
 
 export function ScheduleCard() {
+    const { toast } = useToast()
     const [schedules, setSchedules] = useState<Schedule[]>([])
     const [loading, setLoading] = useState(true)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -61,22 +64,29 @@ export function ScheduleCard() {
             })
 
             if (res.ok) {
+                toast({ title: 'Berhasil', description: editingSchedule ? 'Jadwal diperbarui!' : 'Jadwal ditambahkan!' })
                 setIsDialogOpen(false)
                 setEditingSchedule(null)
                 fetchSchedules()
+            } else {
+                toast({ title: 'Gagal', description: 'Gagal menyimpan jadwal', variant: 'destructive' })
             }
         } catch (e) {
             console.error('Failed to save', e)
+            toast({ title: 'Gagal', description: 'Gagal menyimpan jadwal', variant: 'destructive' })
         }
     }
 
     async function handleDelete(id: string) {
         if (!confirm('Delete this schedule?')) return
         try {
-            await fetch(`/api/admin/schedule?id=${id}`, { method: 'DELETE' })
+            const res = await fetch(`/api/admin/schedule?id=${id}`, { method: 'DELETE' })
+            if (!res.ok) throw new Error('Failed to delete')
+            toast({ title: 'Berhasil', description: 'Jadwal dihapus!' })
             fetchSchedules()
         } catch (e) {
             console.error('Failed to delete', e)
+            toast({ title: 'Gagal', description: 'Gagal menghapus jadwal', variant: 'destructive' })
         }
     }
 
@@ -124,14 +134,14 @@ export function ScheduleCard() {
                                 >
                                     <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button
+                                <AsyncButton
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 text-red-500 hover:text-red-700"
                                     onClick={() => handleDelete(schedule.id)}
                                 >
                                     <Trash2 className="h-4 w-4" />
-                                </Button>
+                                </AsyncButton>
                                 <Badge className={schedule.isActive ? "bg-green-500" : "bg-zinc-500"}>
                                     {schedule.isActive ? 'Active' : 'Off'}
                                 </Badge>
@@ -194,7 +204,7 @@ export function ScheduleCard() {
                             </div>
                             <div className="flex justify-end gap-2">
                                 <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                                <Button onClick={handleSave}>Save</Button>
+                                <AsyncButton onClick={handleSave}>Save</AsyncButton>
                             </div>
                         </DialogContent>
                     </Dialog>
