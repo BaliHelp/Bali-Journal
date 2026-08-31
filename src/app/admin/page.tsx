@@ -353,9 +353,10 @@ export default function MasterAdminDashboard() {
   const [analyzingRisk, setAnalyzingRisk] = useState(false)
   const [riskAnalysis, setRiskAnalysis] = useState<{
     riskScore: number
-    riskLevel: string
+    riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
     containsAccusation: boolean
     recommendations: string[]
+    requiresLegalReview: boolean
   } | null>(null)
 
   // Photo upload state (article edit dialog)
@@ -883,10 +884,15 @@ export default function MasterAdminDashboard() {
     setLoading(true)
 
     try {
+      // Include the re-analyzed risk (if the admin clicked "Analyze Legal
+      // Risk" after editing) so it actually gets saved - previously this
+      // was only ever shown in the dialog and discarded on save, leaving
+      // the stored riskLevel stuck at whatever it was when the article was
+      // first created even after the risky content was edited out.
       const res = await fetch(`/api/articles/${editingArticle.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(articleForm),
+        body: JSON.stringify({ ...articleForm, riskAnalysis: riskAnalysis || undefined }),
       })
 
       const data = await res.json()

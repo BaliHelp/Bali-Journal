@@ -2,7 +2,7 @@ import { myaiCompleteJSON, MYAI_FIELDS } from './myaiClient'
 import { moderateContent } from './moderation'
 import { recallMemories, storeMemory, formatMemoriesForPrompt } from './memory'
 
-interface LegalRiskResult {
+export interface LegalRiskResult {
   riskScore: number // 0-100
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
   containsAccusation: boolean
@@ -25,6 +25,21 @@ export async function analyzeLegalRisk(content: string, title: string): Promise<
       query: `${title}\n${content}`,
     }).catch(() => []) // memory is a nice-to-have, never block the analysis on it
 
+    // Bug found via testing: the old prompt described the desired fields as
+    // a bullet list ("provide scores for: - defamation... Calculate an
+    // overall riskScore...") without ever showing the exact JSON shape, and
+    // the model reasonably-but-differently interpreted that as FLAT keys
+    // (defamation/privacyViolation/... at the top level) with the overall
+    // score named "overallRiskScore" - not nested under "categories" with
+    // the field named "riskScore" as this file's parsing below expected.
+    // recommendations/containsAccusation happened to match by coincidence,
+    // so the mismatch was invisible unless you compared the raw response
+    // against the parsed result: riskScore/categories.* silently defaulted
+    // to 0 (via `|| 0` below) on every single analysis this ran, no matter
+    // how risky the actual content was - the recommendations text could
+    // describe a serious defamation/privacy problem while the stored score
+    // said LOW/0. Pinning the model (kept below, still correct practice)
+    // did NOT fix this - an explicit example JSON block did.
     const result = await myaiCompleteJSON(MYAI_FIELDS.AUDY, [
       {
         role: 'system',
@@ -35,27 +50,36 @@ export async function analyzeLegalRisk(content: string, title: string): Promise<
 3. UU Perlindungan Data Pribadi (Personal Data Protection Law)
 4. Civil and Criminal Code regarding defamation (pencemaran nama baik)
 
-Analyze the content and provide scores for:
-- defamation: Risk of defamation claims (0-100)
-- privacyViolation: Risk of privacy violations (0-100)
-- falseInformation: Risk of spreading false information (0-100)
-- criminalAllegation: Risk from criminal allegations (0-100)
-- corporateRisk: Risk from corporate/enterprise mentions (0-100)
+Score each category 0-100, then compute an overall riskScore (0-100) as
+their weighted severity (not a plain average - a single very high category
+like criminalAllegation or privacyViolation should push the overall score
+up even if the others are low).
 
-Calculate an overall riskScore (0-100) and determine:
-- riskLevel: LOW (0-30), MEDIUM (31-60), HIGH (61-80), CRITICAL (81-100)
-- containsAccusation: Whether content contains direct accusations
-- requiresLegalReview: Whether legal counsel should review before publication
-- recommendations: Array of actionable recommendations in Indonesian
+riskLevel bands: LOW (0-30), MEDIUM (31-60), HIGH (61-80), CRITICAL (81-100).
 
 Use the past decisions below (if any) to stay consistent with how similar cases were judged before.
-Respond ONLY with a JSON object.${formatMemoriesForPrompt(pastDecisions)}`
+
+Respond ONLY with a JSON object in EXACTLY this shape - field names and nesting matter, do not flatten or rename them:
+{
+  "categories": {
+    "defamation": 0-100,
+    "privacyViolation": 0-100,
+    "falseInformation": 0-100,
+    "criminalAllegation": 0-100,
+    "corporateRisk": 0-100
+  },
+  "riskScore": 0-100,
+  "riskLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+  "containsAccusation": true or false,
+  "requiresLegalReview": true or false,
+  "recommendations": ["actionable recommendation in Indonesian", "..."]
+}${formatMemoriesForPrompt(pastDecisions)}`
       },
       {
         role: 'user',
         content: `Analyze this article:\n\nTitle: ${title}\n\nContent:\n${content}`
       }
-    ])
+    ], 'gpt-4o-mini')
 
     const riskScore = Math.min(100, Math.max(0, result.riskScore || 0))
     const riskLevel = getRiskLevelFromScore(riskScore)
@@ -108,6 +132,93 @@ function getRiskLevelFromScore(score: number): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRIT
   if (score <= 60) return 'MEDIUM'
   if (score <= 80) return 'HIGH'
   return 'CRITICAL'
+}
+
+const MAX_REPAIR_ATTEMPTS = 3
+
+export interface RepairResult {
+  title: string
+  excerpt: string
+  content: string
+  riskAnalysis: LegalRiskResult
+  attempts: number
+  /** false if it's still CRITICAL after MAX_REPAIR_ATTEMPTS - caller should hold it as DRAFT for a human, not publish it. */
+  resolved: boolean
+}
+
+/**
+ * Only CRITICAL triggers this (per user decision) - HIGH is left alone and
+ * publishes normally, since the site's automated pipelines (daily cron,
+ * bulk backfill) are the only ones this applies to; anything going through
+ * an admin or "Rewrite External News" has a human already reading it before
+ * it goes out.
+ *
+ * Uses the SAME analysis's category breakdown + recommendations to tell the
+ * AI specifically what to fix (soften unattributed accusations, remove
+ * private/identifying detail, drop unverifiable claims) rather than asking
+ * it to vaguely "make this safer", then re-runs analyzeLegalRisk on the
+ * result. Repeats until the level drops below CRITICAL or the attempt cap
+ * is hit.
+ */
+export async function repairCriticalRisk(
+  input: { title: string; excerpt: string; content: string },
+  initialAnalysis: LegalRiskResult
+): Promise<RepairResult> {
+  let title = input.title
+  let excerpt = input.excerpt
+  let content = input.content
+  let analysis = initialAnalysis
+  let attempts = 0
+
+  while (analysis.riskLevel === 'CRITICAL' && attempts < MAX_REPAIR_ATTEMPTS) {
+    attempts++
+
+    const topCategories = Object.entries(analysis.categories)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, score]) => `${name}: ${score}/100`)
+      .join(', ')
+
+    try {
+      const result = await myaiCompleteJSON<{ title?: string; excerpt?: string; content?: string }>('chatbot', [
+        {
+          role: 'system',
+          content: `You are a senior editor for Bali Journal fixing an article that legal risk analysis flagged as CRITICAL (attempt ${attempts}/${MAX_REPAIR_ATTEMPTS}). Rewrite it to bring the legal risk down while preserving the newsworthy facts - do not just water down the whole story.
+
+Highest-scoring risk categories: ${topCategories}.
+Specific recommendations from the legal reviewer: ${(analysis.recommendations || []).join(' | ') || 'none given'}.
+
+Apply fixes such as: attribute claims properly ("allegedly", "according to police/witnesses") instead of stating them as settled fact, remove or anonymize private/identifying details not essential to the story, remove unverified claims that can't be attributed to a source, soften direct accusations against named individuals/businesses into properly-sourced reporting.
+
+Do NOT fabricate new facts, quotes, or sources to replace what you remove. If a claim can't be safely attributed, cut it rather than inventing an attribution.
+
+Return ONLY a valid JSON object: { "title": "...", "excerpt": "...", "content": "..." } - no commentary.`,
+        },
+        {
+          role: 'user',
+          content: `Title: ${title}\n\nExcerpt: ${excerpt}\n\nContent:\n${content}`,
+        },
+      ], 'gpt-4o-mini')
+
+      if (result.title) title = result.title
+      if (result.excerpt) excerpt = result.excerpt
+      if (result.content) content = result.content
+    } catch (error) {
+      console.error(`Critical-risk repair attempt ${attempts} failed:`, error)
+      break // stop retrying on a hard failure, fall through to the resolved:false return below
+    }
+
+    analysis = await analyzeLegalRisk(content, title)
+  }
+
+  return {
+    title,
+    excerpt,
+    content,
+    riskAnalysis: analysis,
+    attempts,
+    resolved: analysis.riskLevel !== 'CRITICAL',
+  }
 }
 
 export function calculateToxicityScore(content: string): Promise<number> {

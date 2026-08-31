@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { Category, RiskLevel, Verification, Status } from '@prisma/client'
 import { generateAndStoreImage, insertInlineImages } from '@/lib/images/image-service'
 import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
+import { analyzeLegalRisk, repairCriticalRisk } from '@/lib/ai/legal-risk'
 
 
 
@@ -198,6 +199,30 @@ export async function generateNewsArticles(count: number = 3, authorId: string, 
                 continue
             }
 
+            // Proper legal-risk analysis (categories + recommendations),
+            // replacing the self-reported riskLevel from the generation call
+            // above - that one only ever offers LOW/MEDIUM/HIGH (no
+            // CRITICAL option in its own schema) and can't drive a repair
+            // loop since it has no category breakdown. Only CRITICAL is
+            // acted on here (per user decision) - HIGH publishes normally,
+            // since a human hasn't reviewed anything this pipeline produces
+            // before it goes out, so CRITICAL is the one tier worth an
+            // automatic hold-and-fix instead of trusting it straight through.
+            let riskAnalysis = await analyzeLegalRisk(generated.content, generated.title)
+            let finalStatus = status
+            if (riskAnalysis.riskLevel === 'CRITICAL') {
+                const repair = await repairCriticalRisk(
+                    { title: generated.title, excerpt: generated.excerpt, content: generated.content },
+                    riskAnalysis
+                )
+                generated = { ...generated, title: repair.title, excerpt: repair.excerpt, content: repair.content }
+                riskAnalysis = repair.riskAnalysis
+                if (!repair.resolved) {
+                    console.warn(`Article "${generated.title}" still CRITICAL after ${repair.attempts} repair attempt(s) - holding as DRAFT for manual review.`)
+                    finalStatus = 'DRAFT'
+                }
+            }
+
             // Generate unique slug
             const baseSlug = generateSlug(generated.title)
             let slug = baseSlug
@@ -244,15 +269,15 @@ export async function generateNewsArticles(count: number = 3, authorId: string, 
                     featuredImageAlt: generated.title,
                     imageSource: stored.source,
                     aiAssisted: true, // Mark as AI-generated
-                    riskLevel: generated.riskLevel,
-                    riskScore: generated.riskLevel === 'HIGH' ? 70 : generated.riskLevel === 'MEDIUM' ? 40 : 15,
-                    containsAccusation: false,
+                    riskLevel: riskAnalysis.riskLevel,
+                    riskScore: riskAnalysis.riskScore,
+                    containsAccusation: riskAnalysis.containsAccusation,
                     verificationLevel: generated.verificationLevel,
                     evidenceCount: generated.evidenceCount,
-                    legalReviewRequired: generated.riskLevel === 'HIGH',
-                    status: status,
+                    legalReviewRequired: riskAnalysis.requiresLegalReview,
+                    status: finalStatus,
                     authorId,
-                    publishedAt,
+                    publishedAt: finalStatus === 'PUBLISHED' ? publishedAt : null,
                 },
             })
 

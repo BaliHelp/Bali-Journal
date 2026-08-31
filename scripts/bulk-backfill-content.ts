@@ -13,9 +13,14 @@
  *      generator's own duplicate guard).
  *   2. Decide DRAFT vs PUBLISHED: DRAFT if the item is on the manually
  *      curated SENSITIVE_TITLES list (real named individuals/businesses in
- *      an ongoing legal matter) OR if the AI itself comes back with
- *      riskLevel HIGH/CRITICAL. Otherwise PUBLISHED with publishedAt
- *      backdated to the item's original date+time.
+ *      an ongoing legal matter). Otherwise PUBLISHED with publishedAt
+ *      backdated to the item's original date+time - unless the proper
+ *      legal-risk analysis (not the AI's own self-reported estimate) comes
+ *      back CRITICAL, in which case an automatic repair loop rewrites the
+ *      flagged parts and re-checks up to 3 times; if it's still CRITICAL
+ *      after that, the article is held as DRAFT for manual review. HIGH
+ *      alone no longer forces DRAFT - this batch is user-curated from real
+ *      published Bali news, so HIGH publishes normally.
  *   3. Try rewriting from the given source URL. A couple of source links in
  *      this list point at a site's generic /news/ index rather than a
  *      specific article permalink - if the URL fetch fails or extracts too
@@ -34,6 +39,7 @@ import { myaiCompleteJSON } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
 import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
 import { generateAndStoreImage } from '@/lib/images/image-service'
+import { analyzeLegalRisk, repairCriticalRisk } from '@/lib/ai/legal-risk'
 import type { Category } from '@prisma/client'
 
 const BATCH_IMAGE_POOL = [IMAGE_STRATEGIES.gemini, IMAGE_STRATEGIES.gemini, IMAGE_STRATEGIES.pollinations, IMAGE_STRATEGIES.unsplash]
@@ -235,13 +241,48 @@ async function main() {
                 }
             }
 
-            // Re-check riskLevel the AI actually assigned - route to DRAFT even if not on the manual list.
-            if (status === 'PUBLISHED' && (article.riskLevel === 'HIGH' || article.riskLevel === 'CRITICAL')) {
-                await db.article.update({ where: { id: article.id }, data: { status: 'DRAFT', publishedAt: null } })
-                console.log(`  -> DRAFT (AI flagged riskLevel=${article.riskLevel}) - image: ${article.imageSource}`)
+            // Proper legal-risk analysis (categories + recommendations) -
+            // the self-reported riskLevel saved by rewriteExternalNewsToArticle
+            // only ever offers LOW/MEDIUM/HIGH (its own prompt schema has no
+            // CRITICAL option), so it could never actually catch the one tier
+            // that matters here. Only CRITICAL is acted on (per user
+            // decision) - HIGH publishes normally now, on the reasoning that
+            // this whole batch was user-curated from real published Bali
+            // news to begin with.
+            const riskAnalysis = await analyzeLegalRisk(article.content, article.title)
+            let finalStatus = status
+            let finalArticleData: { title: string; excerpt: string; content: string } = article
+
+            if (riskAnalysis.riskLevel === 'CRITICAL') {
+                const repair = await repairCriticalRisk(
+                    { title: article.title, excerpt: article.excerpt, content: article.content },
+                    riskAnalysis
+                )
+                finalArticleData = repair
+                if (!repair.resolved) {
+                    finalStatus = 'DRAFT'
+                    console.log(`  -> DRAFT (still CRITICAL after ${repair.attempts} repair attempt(s)) - image: ${article.imageSource}`)
+                } else {
+                    console.log(`  -> ${status} (repaired from CRITICAL to ${repair.riskAnalysis.riskLevel} in ${repair.attempts} attempt(s)) - image: ${article.imageSource}`)
+                }
             } else {
-                console.log(`  -> ${status} - image: ${article.imageSource}`)
+                console.log(`  -> ${status} (risk: ${riskAnalysis.riskLevel}) - image: ${article.imageSource}`)
             }
+
+            await db.article.update({
+                where: { id: article.id },
+                data: {
+                    title: finalArticleData.title,
+                    excerpt: finalArticleData.excerpt,
+                    content: finalArticleData.content,
+                    status: finalStatus,
+                    publishedAt: finalStatus === 'PUBLISHED' ? publishedAt : null,
+                    riskLevel: riskAnalysis.riskLevel,
+                    riskScore: riskAnalysis.riskScore,
+                    containsAccusation: riskAnalysis.containsAccusation,
+                    legalReviewRequired: riskAnalysis.requiresLegalReview,
+                },
+            })
 
             titleCacheByCategory.get(item.category)!.push(article.title)
             created++

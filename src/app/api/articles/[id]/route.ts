@@ -59,6 +59,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
       ? body.slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 150)
       : undefined
 
+    // riskAnalysis is optional and only present when the admin clicked
+    // "Analyze Legal Risk" again after editing - re-running the analysis
+    // client-side but never persisting the result was the actual gap: the
+    // stored riskLevel/riskScore used to stay frozen at whatever they were
+    // at creation, even after the risky content was edited out.
+    const riskAnalysis = body.riskAnalysis as
+      | { riskScore: number; riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; containsAccusation: boolean; requiresLegalReview: boolean }
+      | undefined
+
     const article = await db.article.update({
       where: { id },
       data: {
@@ -71,6 +80,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
         imageSource: body.imageSource,
         status: body.status,
         ...(slug ? { slug } : {}),
+        ...(riskAnalysis
+          ? {
+              riskScore: riskAnalysis.riskScore,
+              riskLevel: riskAnalysis.riskLevel,
+              containsAccusation: riskAnalysis.containsAccusation,
+              legalReviewRequired: riskAnalysis.requiresLegalReview,
+            }
+          : {}),
       },
     })
 
