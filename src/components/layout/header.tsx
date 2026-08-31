@@ -121,21 +121,26 @@ export function Header() {
         {/* Actions */}
         <div className="flex items-center space-x-2">
           {searchOpen ? (
-            <div className="flex items-center space-x-2">
+            // Plain GET form to /search - no JS wiring needed to actually
+            // search (was previously just a decorative Input with no
+            // onChange/onSubmit at all).
+            <form action="/search" method="get" className="flex items-center space-x-2">
               <Input
                 type="search"
+                name="q"
                 placeholder={t.search}
                 className="w-48 md:w-64"
                 autoFocus
               />
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 onClick={() => setSearchOpen(false)}
               >
                 <X className="h-4 w-4" />
               </Button>
-            </div>
+            </form>
           ) : (
             <>
               {/* Language & Theme */}

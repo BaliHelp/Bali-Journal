@@ -1,6 +1,6 @@
 'use client'
 // Force Rebuild
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AD_POSITIONS } from '@/lib/ads/positions'
@@ -324,7 +324,26 @@ export default function MasterAdminDashboard() {
     totalComments: 0,
     pendingComments: 0,
     highRiskArticles: 0,
+    byStatus: {} as Record<string, number>,
+    byCategory: {} as Record<string, number>,
+    byRole: {} as Record<string, number>,
   })
+
+  // Articles tab: lazy-loaded one calendar month at a time (instead of every
+  // article ever created) - `articles` above stays for List News, which
+  // genuinely wants everything for its copy-all feature and is fetched
+  // separately, only once that tab is actually opened (see the effect near
+  // the bottom of this file).
+  const [monthlyArticles, setMonthlyArticles] = useState<Article[]>([])
+  const [articlesCursor, setArticlesCursor] = useState<string | undefined>(undefined)
+  const [articlesHasMore, setArticlesHasMore] = useState(true)
+  const [articlesLoadingMore, setArticlesLoadingMore] = useState(false)
+  const [articlesTabLoaded, setArticlesTabLoaded] = useState(false)
+  const [listNewsLoaded, setListNewsLoaded] = useState(false)
+  const [searchResults, setSearchResults] = useState<Article[] | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [highRiskList, setHighRiskList] = useState<Article[] | null>(null)
+  const [highRiskLoading, setHighRiskLoading] = useState(false)
 
   // UI states
   const [loading, setLoading] = useState(true)
@@ -588,6 +607,30 @@ export default function MasterAdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
+  // Articles tab: load the first month lazily, only once the tab is
+  // actually opened - not on every dashboard visit.
+  useEffect(() => {
+    if (activeTab === 'articles' && !articlesTabLoaded) {
+      setArticlesTabLoaded(true)
+      fetchMonthlyArticles()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  // List News tab genuinely wants every article at once (its whole point is
+  // copying the full list) - fetched once, lazily, only when that specific
+  // tab is opened, so it doesn't add to every other tab's load weight.
+  useEffect(() => {
+    if (activeTab === 'listnews' && !listNewsLoaded) {
+      setListNewsLoaded(true)
+      fetch('/api/admin/articles')
+        .then((res) => res.json())
+        .then((data) => { if (Array.isArray(data.articles)) setArticles(data.articles) })
+        .catch((err) => console.error('Failed to load articles for List News:', err))
+    }
+  }, [activeTab, listNewsLoaded])
+
+
   async function handleApproveAdvertiser(id: string) {
     try {
       const res = await fetch(`/api/admin/advertisers/${id}`, {
@@ -723,6 +766,32 @@ export default function MasterAdminDashboard() {
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Debounced server-side search for the Articles tab - searches every
+  // article regardless of which months are currently loaded.
+  useEffect(() => {
+    if (activeTab !== 'articles') return
+    const handle = setTimeout(() => searchArticles(searchQuery), 300)
+    return () => clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, activeTab])
+
+  // Infinite scroll: load the next older month once the sentinel row at the
+  // bottom of the Articles table scrolls into view.
+  const articlesSentinelRef = useRef<HTMLTableRowElement | null>(null)
+  useEffect(() => {
+    const el = articlesSentinelRef.current
+    if (!el || activeTab !== 'articles' || searchQuery.trim()) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) fetchMonthlyArticles()
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, searchQuery, articlesHasMore, articlesLoadingMore])
   const [authChecked, setAuthChecked] = useState(false)
 
   // Check authentication on mount
@@ -764,40 +833,100 @@ export default function MasterAdminDashboard() {
 
   const pendingInvoiceCount = invoices.filter((inv) => inv.status === 'VERIFYING').length
 
+  // Overview cards + popups now read from a cheap aggregate endpoint
+  // (count()/groupBy() queries) instead of loading every article row just
+  // to .filter().length it here - that full-articles fetch was the actual
+  // weight behind the admin panel feeling heavy as the article count grew.
   async function fetchAllData() {
     setLoading(true)
     try {
-      const [articlesRes, commentsRes, usersRes, reportsRes] = await Promise.all([
-        fetch('/api/admin/articles'),
+      const [statsRes, commentsRes, usersRes, reportsRes] = await Promise.all([
+        fetch('/api/admin/stats'),
         fetch('/api/admin/comments'),
         fetch('/api/admin/users'),
         fetch('/api/admin/reports'),
       ])
 
-      const articlesData = articlesRes.ok ? await articlesRes.json() : { articles: [] }
+      const statsData = statsRes.ok ? await statsRes.json() : null
       const commentsData = commentsRes.ok ? await commentsRes.json() : { comments: [] }
       const usersData = usersRes.ok ? await usersRes.json() : { users: [] }
       const reportsData = reportsRes.ok ? await reportsRes.json() : []
 
-      if (Array.isArray(articlesData.articles)) setArticles(articlesData.articles)
       if (Array.isArray(commentsData.comments)) setComments(commentsData.comments)
       if (Array.isArray(usersData.users)) setUsers(usersData.users)
       if (Array.isArray(reportsData)) setReports(reportsData)
 
-      // Calculate stats
-      setStats({
-        totalArticles: articlesData.articles?.length || 0,
-        publishedArticles: articlesData.articles?.filter((a: Article) => a.status === 'PUBLISHED').length || 0,
-        totalUsers: usersData.users?.length || 0,
-        totalComments: commentsData.comments?.length || 0,
-        pendingComments: commentsData.comments?.filter((c: Comment) => c.status === 'PENDING').length || 0,
-        highRiskArticles: articlesData.articles?.filter((a: Article) => ['HIGH', 'CRITICAL'].includes(a.riskLevel)).length || 0,
-      })
+      if (statsData) {
+        setStats({
+          totalArticles: statsData.totalArticles || 0,
+          publishedArticles: statsData.publishedArticles || 0,
+          totalUsers: statsData.totalUsers || 0,
+          totalComments: statsData.totalComments || 0,
+          pendingComments: statsData.pendingComments || 0,
+          highRiskArticles: statsData.highRiskArticles || 0,
+          byStatus: statsData.byStatus || {},
+          byCategory: statsData.byCategory || {},
+          byRole: statsData.byRole || {},
+        })
+      }
     } catch (err) {
       console.error('Error fetching data:', err)
       setError('Failed to load dashboard data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  /** Fetches the next OLDER calendar month of articles for the Articles tab table. */
+  async function fetchMonthlyArticles() {
+    if (articlesLoadingMore || !articlesHasMore) return
+    setArticlesLoadingMore(true)
+    try {
+      const url = articlesCursor
+        ? `/api/admin/articles/by-month?before=${encodeURIComponent(articlesCursor)}`
+        : '/api/admin/articles/by-month'
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Failed to load articles')
+      const data = await res.json()
+      setMonthlyArticles((prev) => [...prev, ...(data.articles || [])])
+      setArticlesHasMore(!!data.hasMore)
+      setArticlesCursor(data.month ? `${data.month}-01` : undefined)
+    } catch (err) {
+      console.error('Failed to load monthly articles:', err)
+    } finally {
+      setArticlesLoadingMore(false)
+    }
+  }
+
+  /** Server-side search across every article (not just loaded months) - Articles tab search box. */
+  async function searchArticles(q: string) {
+    if (!q.trim()) {
+      setSearchResults(null)
+      return
+    }
+    setSearchLoading(true)
+    try {
+      const res = await fetch(`/api/admin/articles?q=${encodeURIComponent(q.trim())}`)
+      const data = await res.json()
+      setSearchResults(Array.isArray(data.articles) ? data.articles : [])
+    } catch (err) {
+      console.error('Article search failed:', err)
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  async function fetchHighRiskList() {
+    if (highRiskList !== null || highRiskLoading) return
+    setHighRiskLoading(true)
+    try {
+      const res = await fetch('/api/admin/articles?riskLevel=HIGH,CRITICAL')
+      const data = await res.json()
+      setHighRiskList(Array.isArray(data.articles) ? data.articles : [])
+    } catch (err) {
+      console.error('Failed to load high-risk articles:', err)
+    } finally {
+      setHighRiskLoading(false)
     }
   }
 
@@ -1070,16 +1199,11 @@ export default function MasterAdminDashboard() {
     }
   }
 
-  // Enhanced Search Logic
-  const filteredArticles = articles.filter(a => {
-    const q = searchQuery.toLowerCase()
-    return (
-      a.title.toLowerCase().includes(q) ||
-      a.category.toLowerCase().includes(q) ||
-      a.author?.name?.toLowerCase().includes(q) ||
-      a.status.toLowerCase().includes(q)
-    )
-  })
+  // Articles tab: while searching, results come from the server (every
+  // article, regardless of which months happen to be loaded); otherwise
+  // show whatever months have been lazily loaded so far.
+  const isSearchingArticles = searchQuery.trim().length > 0
+  const filteredArticles = isSearchingArticles ? (searchResults ?? []) : monthlyArticles
 
   // Filter Comments
   const filteredComments = comments.filter(c => {
@@ -1213,7 +1337,7 @@ export default function MasterAdminDashboard() {
                     <MessageCircle className="h-8 w-8 text-yellow-500 opacity-20" />
                   </CardContent>
                 </Card>
-                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setStatDialog('risk')}>
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => { setStatDialog('risk'); fetchHighRiskList() }}>
                   <CardContent className="p-4 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">High Risk Articles</p>
@@ -1250,12 +1374,14 @@ export default function MasterAdminDashboard() {
           <Dialog open={statDialog !== null} onOpenChange={(open) => !open && setStatDialog(null)}>
             <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
               {statDialog === 'articles' && (() => {
+                // Straight from the /api/admin/stats aggregate - no need to
+                // have every article's row loaded just to count them.
                 const byStatus = ['DRAFT', 'REVIEW', 'PUBLISHED', 'REJECTED'].map((s) => ({
                   status: s,
-                  count: articles.filter((a) => a.status === s).length,
+                  count: stats.byStatus[s] || 0,
                 }))
-                const byCategory = Array.from(new Set(articles.map((a) => a.category)))
-                  .map((c) => ({ category: c, count: articles.filter((a) => a.category === c).length }))
+                const byCategory = Object.entries(stats.byCategory)
+                  .map(([category, count]) => ({ category, count }))
                   .sort((a, b) => b.count - a.count)
                 return (
                   <>
@@ -1327,16 +1453,22 @@ export default function MasterAdminDashboard() {
               })()}
 
               {statDialog === 'risk' && (() => {
-                const highRisk = articles
-                  .filter((a) => a.riskLevel === 'HIGH' || a.riskLevel === 'CRITICAL')
-                  .sort((a, b) => b.riskScore - a.riskScore)
+                // Fetched on-demand (see fetchHighRiskList, triggered when this
+                // dialog opens) instead of requiring the full articles list to
+                // already be loaded just to filter it client-side.
+                const highRisk = (highRiskList || []).slice().sort((a, b) => b.riskScore - a.riskScore)
                 return (
                   <>
                     <DialogHeader>
                       <DialogTitle>High Risk Articles: {stats.highRiskArticles}</DialogTitle>
                       <DialogDescription>Artikel dengan risiko hukum HIGH atau CRITICAL.</DialogDescription>
                     </DialogHeader>
-                    {highRisk.length === 0 ? (
+                    {highRiskLoading ? (
+                      <p className="text-sm text-muted-foreground py-4">
+                        <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                        Memuat...
+                      </p>
+                    ) : highRisk.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-4">Tidak ada artikel berisiko tinggi saat ini.</p>
                     ) : (
                       <ScrollArea className="max-h-80">
@@ -1799,14 +1931,35 @@ export default function MasterAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredArticles.length === 0 ? (
+                    {isSearchingArticles && searchLoading && searchResults === null ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                          Searching...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredArticles.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No articles found
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredArticles.map((article) => (
+                      filteredArticles.map((article, idx) => {
+                        const monthLabel = new Date(article.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                        const prevMonthLabel = idx > 0
+                          ? new Date(filteredArticles[idx - 1].createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                          : null
+                        const showMonthHeader = !isSearchingArticles && monthLabel !== prevMonthLabel
+                        return (
+                        <Fragment key={article.id}>
+                        {showMonthHeader && (
+                          <TableRow key={`month-${monthLabel}`} className="bg-muted/40 hover:bg-muted/40">
+                            <TableCell colSpan={8} className="py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {monthLabel}
+                            </TableCell>
+                          </TableRow>
+                        )}
                         <TableRow key={article.id}>
                           <TableCell className="hidden sm:table-cell">
                             <div className="relative w-16 h-12 rounded overflow-hidden bg-muted">
@@ -1875,7 +2028,22 @@ export default function MasterAdminDashboard() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
+                        </Fragment>
+                        )
+                      })
+                    )}
+                    {!isSearchingArticles && (
+                      <TableRow ref={articlesSentinelRef}>
+                        <TableCell colSpan={8} className="py-4 text-center text-xs text-muted-foreground">
+                          {articlesLoadingMore ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin inline mr-2" />Loading more...</>
+                          ) : articlesHasMore ? (
+                            <Button variant="ghost" size="sm" onClick={() => fetchMonthlyArticles()}>Load older articles</Button>
+                          ) : filteredArticles.length > 0 ? (
+                            'No more articles'
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
                     )}
                   </TableBody>
                 </Table>

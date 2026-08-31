@@ -82,6 +82,7 @@ The prompt must:
 - Ground the image in the concrete details you identified, not just the category.
 - Include: "Bali, Indonesia", the visual style described above, and this safety clause verbatim: "fully clothed, professional attire, tasteful composition, appropriate for a general-audience news outlet, no nudity, no sexual content".
 - Never mention real named individuals by name (describe roles/actions instead, not identities).
+- NEVER default to a person reading, holding, or looking at a newspaper - this is a stock-photo cliche that shows up so often it makes every story look identical, especially for abstract/analytical stories (opinion, analysis) that don't have an obvious concrete subject. For those, use something else grounded in the story's actual topic instead: a symbolic object, a relevant location, an abstract/artistic composition, a silhouette, an aerial view - anything but a person with a newspaper.
 
 CRITICAL: Do your identification/reasoning step silently. Do NOT write it out. Your entire response must be nothing but the final prompt itself - no preamble, no "Here is my analysis", no summary paragraph before it, no quotation marks, no explanation, no markdown. The very first word of your response must be the first word of the image description.`,
             },

@@ -73,6 +73,8 @@ export async function POST(request: NextRequest) {
     // Analyze legal risk
     const riskAnalysis = await analyzeLegalRisk(content, title)
 
+    const status = body.status || 'DRAFT'
+
     // Create article
     const article = await db.article.create({
       data: {
@@ -88,7 +90,13 @@ export async function POST(request: NextRequest) {
         riskScore: riskAnalysis.riskScore,
         containsAccusation: riskAnalysis.containsAccusation,
         legalReviewRequired: riskAnalysis.requiresLegalReview,
-        status: body.status || 'DRAFT',
+        status,
+        // Was never set here at all, so an article created straight to
+        // PUBLISHED (not through the AI generators, which do set this) had
+        // publishedAt stuck at null - it displayed with no date anywhere
+        // that shows one (Breaking News sidebar, article byline) and could
+        // sort incorrectly next to genuinely-dated articles.
+        publishedAt: status === 'PUBLISHED' ? new Date() : null,
         authorId: user.id,
       },
     })

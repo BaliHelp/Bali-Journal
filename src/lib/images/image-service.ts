@@ -62,15 +62,109 @@ function extractKeywords(title: string): string {
 // instead of drifting into slightly different prompt logic.
 // ---------------------------------------------------------------------------
 
-/** Visual grounding per category so images actually look like the story they illustrate. */
-const CATEGORY_VISUALS: Record<string, string> = {
-    TOURISM: 'iconic Bali destination, tropical beach, temple or resort atmosphere',
-    GOVERNMENT: 'official government office or press conference setting in Indonesia',
-    INVESTMENT: 'modern business district, office towers, professional meeting',
-    INCIDENTS: 'emergency response scene, rescue workers, safety perimeter',
-    LOCAL: 'Balinese village community life, traditional ceremony, local market',
-    JOBS: 'job fair crowd, professionals, training workshop room',
-    OPINION: 'thoughtful editorial concept, person reading newspaper, city backdrop',
+/**
+ * 10 rotating visual concepts per category (not one fixed phrase) - a single
+ * fixed string per category, especially OPINION's old "person reading
+ * newspaper", meant every image in that category converged on the same
+ * composition regardless of which specific story it was for. Each category
+ * cycles through its own 10 independently (see categoryVisualIndex below),
+ * so consecutive articles in the same category don't repeat.
+ */
+const CATEGORY_VISUAL_CONCEPTS: Record<string, string[]> = {
+    TOURISM: [
+        'white-sand beach with turquoise water, surfers in the distance',
+        'ancient stone temple gate (candi bentar) framed by tropical foliage',
+        'luxury resort infinity pool overlooking rice terraces',
+        'bustling tourist street market with handicrafts and warungs',
+        'traditional Balinese dance performance, ornate costumes',
+        'rice terrace landscape at sunrise, Ubud countryside',
+        'beach club sunset gathering, string lights, ocean view',
+        'scooter riders navigating a scenic coastal road',
+        'yacht or dive boat off a Bali coastline',
+        'hotel lobby with tropical architecture and greenery',
+    ],
+    GOVERNMENT: [
+        "governor's office desk with Indonesian flag and official seal",
+        'press conference podium with microphones, officials seated behind',
+        'provincial parliament session, legislators in formal attire',
+        'government building exterior, Indonesian architecture, flag flying',
+        'official ceremony with sash-wearing dignitaries',
+        'public service counter, citizens being assisted by civil servants',
+        'policy signing event, officials shaking hands over documents',
+        'regional meeting hall, officials seated around a long table',
+        'uniformed government inspector reviewing site documents',
+        'courthouse or municipal building steps, formal proceedings',
+    ],
+    INVESTMENT: [
+        'glass-walled boardroom, executives reviewing charts',
+        'modern office tower skyline against blue sky',
+        'handshake between business partners closing a deal',
+        'investor presentation with financial graphs on a screen',
+        'construction site of a new development project',
+        'co-working space with entrepreneurs collaborating',
+        'bank or financial institution interior, professional setting',
+        'groundbreaking ceremony with hard hats and shovels',
+        'startup team working late in a modern office',
+        'financial data displayed across multiple monitors',
+    ],
+    INCIDENTS: [
+        'emergency responders at a scene, flashing lights',
+        'police tape cordoning off an area, officers on scene',
+        'ambulance or fire truck arriving at an incident location',
+        'crowd gathered watching an unfolding emergency',
+        'damaged property or vehicle after an incident',
+        'investigators examining a scene, evidence markers',
+        'rescue workers coordinating near water or difficult terrain',
+        'hospital exterior or emergency room entrance',
+        'news photographer capturing an incident aftermath',
+        'community members assisting during a local emergency',
+    ],
+    LOCAL: [
+        'traditional Balinese ceremony, offerings and incense',
+        'local market vendors selling fresh produce',
+        'village elders in discussion under a banyan tree',
+        'community gotong-royong (mutual aid) work event',
+        'traditional home compound courtyard scene',
+        'schoolchildren walking through a village lane',
+        'local artisan crafting traditional goods by hand',
+        'rural road lined with rice paddies and farmers',
+        'neighborhood banjar (community hall) gathering',
+        'fishermen preparing boats at a local harbor',
+    ],
+    JOBS: [
+        'job fair booth with recruiters and applicants',
+        'vocational training workshop, hands-on instruction',
+        'office interview setting, candidate and interviewer',
+        'hospitality staff training session',
+        'group of young professionals networking',
+        'resume review at a career counseling desk',
+        'tourism industry staff in uniform at a workplace',
+        'construction or trade workers on a job site',
+        'remote worker at a co-working desk',
+        'graduation or certification ceremony for trainees',
+    ],
+    OPINION: [
+        'empty park bench overlooking a Bali cityscape at dusk',
+        'close-up of hands writing notes at a wooden desk',
+        'silhouette of a person against a dramatic Bali sunset',
+        'scales-of-justice motif with a Balinese temple gate in the background',
+        'quiet coffee shop table with a laptop and notebook, contemplative mood',
+        'wide shot of a crowded street symbolizing public debate',
+        'traditional and modern Bali architecture juxtaposed in one frame',
+        'close-up of a gavel or ballot box, symbolic of policy and decisions',
+        'aerial view of Bali\'s coastline representing the island\'s future',
+        'a lone figure walking along a quiet rice-terrace path, reflective mood',
+    ],
+}
+
+const categoryVisualIndex = new Map<string, number>()
+
+function nextCategoryVisual(category?: string): string {
+    const concepts = (category && CATEGORY_VISUAL_CONCEPTS[category]) || CATEGORY_VISUAL_CONCEPTS.LOCAL
+    const key = category || '_default'
+    const i = categoryVisualIndex.get(key) || 0
+    categoryVisualIndex.set(key, i + 1)
+    return concepts[i % concepts.length]
 }
 
 // Applied to every generated prompt - restricts generators from producing
@@ -144,7 +238,7 @@ function randomFrom<T>(arr: T[]): T {
  * its own copy.
  */
 export function buildImagePrompt(title: string, category?: string, excerpt?: string): string {
-    const categoryVisual = (category && CATEGORY_VISUALS[category]) || 'bali news, editorial photography'
+    const categoryVisual = nextCategoryVisual(category)
     const titleContext = extractContentKeywords(title, 8)
     const excerptSnippet = shortExcerptSnippet(excerpt || '', 6)
     const composition = randomFrom(COMPOSITION_VARIANTS)

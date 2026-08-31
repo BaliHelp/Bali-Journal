@@ -50,6 +50,18 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const { id } = await params
     const body = await request.json()
 
+    // publishedAt: only touched on an actual status transition, never
+    // stomped on every save. Missing entirely here used to mean an article
+    // edited from DRAFT to PUBLISHED (or created PUBLISHED via POST, see
+    // that route's own matching fix) got stuck with publishedAt: null
+    // forever - no date anywhere it's shown (Breaking News sidebar,
+    // article byline).
+    let publishedAt: Date | null | undefined = undefined
+    if (body.status) {
+      const existing = await db.article.findUnique({ where: { id }, select: { publishedAt: true } })
+      publishedAt = body.status === 'PUBLISHED' ? (existing?.publishedAt ?? new Date()) : null
+    }
+
     // Slug is optional and admin-editable here - sanitized the same way as
     // on create, but NOT auto-generated from the title (an edit shouldn't
     // silently change a published article's URL unless the admin explicitly
@@ -79,6 +91,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
         featuredImageAlt: body.featuredImageAlt,
         imageSource: body.imageSource,
         status: body.status,
+        ...(publishedAt !== undefined ? { publishedAt } : {}),
         ...(slug ? { slug } : {}),
         ...(riskAnalysis
           ? {
