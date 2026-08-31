@@ -1,45 +1,52 @@
 import { MetadataRoute } from 'next'
 import { db } from '@/lib/db'
+import { SITE_URL } from '@/lib/site-config'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-    const baseUrl = 'https://www.balijournal.com' // Replace with your actual domain
-
-    // 1. Static Routes
+    // 1. Static, content-bearing routes only - /login and /register have no
+    // SEO value and were previously listed here at priority 1 (same as the
+    // homepage), which wastes crawl budget on pages Google should never
+    // rank anyway.
     const staticRoutes = [
-        '',
-        '/about',
-        '/contact',
-        '/login',
-        '/register',
-        '/submit-report',
-        '/transparency',
-    ].map((route) => ({
-        url: `${baseUrl}${route}`,
+        { route: '', priority: 1.0, changeFrequency: 'hourly' as const },
+        { route: '/news', priority: 0.9, changeFrequency: 'hourly' as const },
+        { route: '/about', priority: 0.5, changeFrequency: 'monthly' as const },
+        { route: '/contact', priority: 0.3, changeFrequency: 'monthly' as const },
+        { route: '/transparency', priority: 0.4, changeFrequency: 'monthly' as const },
+        { route: '/submit-report', priority: 0.3, changeFrequency: 'monthly' as const },
+        { route: '/editorial-guidelines', priority: 0.3, changeFrequency: 'monthly' as const },
+    ].map(({ route, priority, changeFrequency }) => ({
+        url: `${SITE_URL}${route}`,
         lastModified: new Date(),
-        changeFrequency: 'daily' as const,
-        priority: 1,
+        changeFrequency,
+        priority,
     }))
 
     // 2. Dynamic Articles
     const articles = await db.article.findMany({
         where: { status: 'PUBLISHED' },
-        select: { slug: true, updatedAt: true }
+        select: { slug: true, updatedAt: true, publishedAt: true },
+        orderBy: { publishedAt: 'desc' },
     })
 
     const articleRoutes = articles.map((article) => ({
-        url: `${baseUrl}/article/${article.slug}`,
+        url: `${SITE_URL}/article/${article.slug}`,
         lastModified: article.updatedAt,
         changeFrequency: 'weekly' as const,
-        priority: 0.8,
+        // Freshly published articles get a small priority boost - they're
+        // the pages most likely to be actively searched for right now.
+        priority: article.publishedAt && Date.now() - article.publishedAt.getTime() < 3 * 24 * 3600 * 1000 ? 0.9 : 0.7,
     }))
 
-    // 3. Category Routes
-    const categories = ['tourism', 'investment', 'incidents', 'local', 'jobs', 'opinion']
-    const categoryRoutes = categories.map(cat => ({
-        url: `${baseUrl}/category/${cat}`,
+    // 3. Category Routes - was missing GOVERNMENT, the single largest
+    // category in the dataset, so its 20+ articles' category page was
+    // never being surfaced to crawlers via this list at all.
+    const categories = ['tourism', 'government', 'investment', 'incidents', 'local', 'jobs', 'opinion']
+    const categoryRoutes = categories.map((cat) => ({
+        url: `${SITE_URL}/category/${cat}`,
         lastModified: new Date(),
-        changeFrequency: 'daily' as const,
-        priority: 0.9,
+        changeFrequency: 'hourly' as const,
+        priority: 0.85,
     }))
 
     return [...staticRoutes, ...categoryRoutes, ...articleRoutes]

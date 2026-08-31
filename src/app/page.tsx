@@ -141,6 +141,7 @@ export default async function HomePage() {
                         src={featuredArticle.featuredImageUrl}
                         alt={featuredArticle.featuredImageAlt || featuredArticle.title}
                         fill
+                        sizes="(min-width: 1024px) 800px, 100vw"
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                         priority
                       />
@@ -224,6 +225,7 @@ export default async function HomePage() {
                             src={article.featuredImageUrl}
                             alt={article.featuredImageAlt || article.title}
                             fill
+                            sizes="80px"
                             className="object-cover transition-transform group-hover:scale-110"
                           />
                         ) : (

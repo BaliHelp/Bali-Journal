@@ -239,6 +239,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                   src={article.featuredImageUrl}
                   alt={article.featuredImageAlt || article.title}
                   fill
+                  sizes="(min-width: 1024px) 896px, 100vw"
                   className="object-cover"
                   priority
                 />

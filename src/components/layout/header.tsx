@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Menu, Search, User, X, Globe, Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Menu, Search, User, X, Settings, Sun, Moon, Monitor, Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
 const categories = {
@@ -152,9 +152,8 @@ export function Header() {
                       settles correctly post-hydration; nothing about aria wiring or click
                       behavior is affected). suppressHydrationWarning targets just that one
                       attribute instead of silencing hydration mismatches app-wide. */}
-                  <Button variant="ghost" size="sm" className="gap-1" suppressHydrationWarning>
-                    <Globe className="h-4 w-4" />
-                    <span className="text-xs font-semibold">{lang === 'en' ? 'EN' : 'ID'}</span>
+                  <Button variant="ghost" size="icon" suppressHydrationWarning aria-label="Bahasa & Tema">
+                    <Settings className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">

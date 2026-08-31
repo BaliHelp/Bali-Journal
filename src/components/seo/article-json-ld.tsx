@@ -10,6 +10,7 @@ interface Article {
   featuredImageUrl: string | null
   featuredImageAlt: string | null
   publishedAt: Date | null
+  updatedAt?: Date | null
   author?: { name: string | null } | null
 }
 
@@ -40,7 +41,7 @@ export function ArticleJsonLd({ article }: ArticleJsonLdProps) {
     description: article.excerpt,
     image: article.featuredImageUrl ? [article.featuredImageUrl] : [],
     datePublished: article.publishedAt?.toISOString(),
-    dateModified: article.publishedAt?.toISOString(),
+    dateModified: (article.updatedAt ?? article.publishedAt)?.toISOString(),
     author: {
       '@type': 'Person',
       name: article.author?.name || `Tim ${SITE_NAME}`,

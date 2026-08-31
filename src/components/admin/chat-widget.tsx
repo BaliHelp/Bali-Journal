@@ -79,9 +79,18 @@ export function AdminChatWidget({ onRefresh }: AccessProps) {
         (Object.keys(agentStyles) as AgentType[]).forEach(a => checkConnection(a))
     }
 
+    // Was firing 4 concurrent agent pings (each 2 DB writes + 1 external
+    // gateway call) on every single admin page load, regardless of whether
+    // the chat panel was ever opened - real, measurable contention against
+    // this project's single pooled DB connection right when the dashboard
+    // is trying to load everything else. Now only pings on first open.
+    const hasConnectedRef = useRef(false)
     useEffect(() => {
-        handleReconnect()
-    }, [])
+        if (isOpen && !hasConnectedRef.current) {
+            hasConnectedRef.current = true
+            handleReconnect()
+        }
+    }, [isOpen])
 
     // --- AUTO-AUDIT TIMER (Every 5 Minutes) ---
     useEffect(() => {

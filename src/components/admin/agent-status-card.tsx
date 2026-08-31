@@ -42,7 +42,10 @@ export function AgentStatusCard() {
         }
 
         fetchStatus()
-        const interval = setInterval(fetchStatus, 3000) // Fast poll for "Real-time" feel
+        // 3s was hammering the single pooled DB connection for a purely
+        // decorative status widget; 15s still reads as "live" without
+        // competing with real admin actions for that connection.
+        const interval = setInterval(fetchStatus, 15000)
         return () => clearInterval(interval)
     }, [])
 

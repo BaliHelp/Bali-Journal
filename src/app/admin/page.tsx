@@ -60,6 +60,7 @@ import {
   Users,
   MessageCircle,
   Shield,
+  ShieldAlert,
   BarChart3,
   Settings,
   Search,
@@ -345,6 +346,11 @@ export default function MasterAdminDashboard() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [highRiskList, setHighRiskList] = useState<Article[] | null>(null)
   const [highRiskLoading, setHighRiskLoading] = useState(false)
+  // Articles tab sub-view: 'all' is the month-paginated table, 'risk' is a
+  // flat list of every HIGH/CRITICAL article regardless of which month it's
+  // in - reuses the same on-demand fetch the Overview "High Risk Articles"
+  // popup already uses, so switching to this view is instant on a repeat visit.
+  const [articlesView, setArticlesView] = useState<'all' | 'risk'>('all')
 
   // UI states
   const [loading, setLoading] = useState(true)
@@ -792,18 +798,27 @@ export default function MasterAdminDashboard() {
   // Debounced server-side search for the Articles tab - searches every
   // article regardless of which months are currently loaded.
   useEffect(() => {
-    if (activeTab !== 'articles') return
+    if (activeTab !== 'articles' || articlesView !== 'all') return
     const handle = setTimeout(() => searchArticles(searchQuery), 300)
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, activeTab])
+  }, [searchQuery, activeTab, articlesView])
+
+  // Fetch the High Risk & Critical list on first switch to that sub-view -
+  // fetchHighRiskList() is itself idempotent (skips if already loaded), so
+  // this is also what makes the Overview popup and this tab share one fetch.
+  useEffect(() => {
+    if (activeTab === 'articles' && articlesView === 'risk') {
+      fetchHighRiskList()
+    }
+  }, [activeTab, articlesView])
 
   // Infinite scroll: load the next older month once the sentinel row at the
   // bottom of the Articles table scrolls into view.
   const articlesSentinelRef = useRef<HTMLTableRowElement | null>(null)
   useEffect(() => {
     const el = articlesSentinelRef.current
-    if (!el || activeTab !== 'articles' || searchQuery.trim()) return
+    if (!el || activeTab !== 'articles' || articlesView !== 'all' || searchQuery.trim()) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) fetchMonthlyArticles()
@@ -813,7 +828,7 @@ export default function MasterAdminDashboard() {
     observer.observe(el)
     return () => observer.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, searchQuery, articlesHasMore, articlesLoadingMore])
+  }, [activeTab, articlesView, searchQuery, articlesHasMore, articlesLoadingMore])
   const [authChecked, setAuthChecked] = useState(false)
 
   // Check authentication on mount
@@ -1222,7 +1237,15 @@ export default function MasterAdminDashboard() {
   // article, regardless of which months happen to be loaded); otherwise
   // show whatever months have been lazily loaded so far.
   const isSearchingArticles = searchQuery.trim().length > 0
-  const filteredArticles = isSearchingArticles ? (searchResults ?? []) : monthlyArticles
+  const filteredArticles =
+    articlesView === 'risk'
+      ? (highRiskList ?? [])
+          .filter((a) => !isSearchingArticles || a.title.toLowerCase().includes(searchQuery.toLowerCase()))
+          .slice()
+          .sort((a, b) => b.riskScore - a.riskScore)
+      : isSearchingArticles
+        ? (searchResults ?? [])
+        : monthlyArticles
 
   // Filter Comments
   const filteredComments = comments.filter(c => {
@@ -1909,11 +1932,34 @@ export default function MasterAdminDashboard() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                <div className="flex items-center gap-4 mt-4">
+                <div className="flex items-center gap-2 mt-4">
+                  <Button
+                    variant={articlesView === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setArticlesView('all')}
+                  >
+                    Semua Artikel
+                  </Button>
+                  <Button
+                    variant={articlesView === 'risk' ? 'default' : 'outline'}
+                    size="sm"
+                    className={articlesView === 'risk' ? 'bg-red-600 hover:bg-red-700' : 'text-red-600 border-red-200 hover:bg-red-50'}
+                    onClick={() => setArticlesView('risk')}
+                  >
+                    <ShieldAlert className="h-4 w-4 mr-1.5" />
+                    High Risk & Critical
+                    {stats.highRiskArticles > 0 && (
+                      <Badge variant="secondary" className="ml-1.5 bg-white/20 text-inherit hover:bg-white/20">
+                        {stats.highRiskArticles}
+                      </Badge>
+                    )}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-4 mt-3">
                   <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search articles..."
+                      placeholder={articlesView === 'risk' ? 'Filter judul di daftar High Risk & Critical...' : 'Search articles...'}
                       className="pl-8"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -1936,7 +1982,14 @@ export default function MasterAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isSearchingArticles && searchLoading && searchResults === null ? (
+                    {articlesView === 'risk' && highRiskLoading && highRiskList === null ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                          Memuat artikel HIGH & CRITICAL...
+                        </TableCell>
+                      </TableRow>
+                    ) : isSearchingArticles && articlesView === 'all' && searchLoading && searchResults === null ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
@@ -1946,16 +1999,17 @@ export default function MasterAdminDashboard() {
                     ) : filteredArticles.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                          No articles found
+                          {articlesView === 'risk' ? 'Tidak ada artikel HIGH atau CRITICAL saat ini.' : 'No articles found'}
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredArticles.map((article, idx) => {
+                        const groupByMonth = articlesView === 'all' && !isSearchingArticles
                         const monthLabel = new Date(article.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                         const prevMonthLabel = idx > 0
                           ? new Date(filteredArticles[idx - 1].createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                           : null
-                        const showMonthHeader = !isSearchingArticles && monthLabel !== prevMonthLabel
+                        const showMonthHeader = groupByMonth && monthLabel !== prevMonthLabel
                         return (
                         <Fragment key={article.id}>
                         {showMonthHeader && (
@@ -2039,7 +2093,7 @@ export default function MasterAdminDashboard() {
                         )
                       })
                     )}
-                    {!isSearchingArticles && (
+                    {articlesView === 'all' && !isSearchingArticles && (
                       <TableRow ref={articlesSentinelRef}>
                         <TableCell colSpan={8} className="py-4 text-center text-xs text-muted-foreground">
                           {articlesLoadingMore ? (
