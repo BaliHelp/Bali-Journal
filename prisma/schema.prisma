@@ -244,6 +244,23 @@ model Report {
   @@map("reports")
 }
 
+// Public masthead roster - admin-editable, shown on About Us and the
+// Editorial Team page. Deliberately starts empty rather than seeded with
+// placeholder names/headcounts.
+model TeamMember {
+  id        String   @id @default(uuid())
+  name      String
+  role      String
+  bio       String?
+  photoUrl  String?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("team_members")
+}
+
 // Editable Schedule Configuration
 model ScheduleConfig {
   id        String   @id @default(cuid())

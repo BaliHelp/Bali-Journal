@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Mail, Send, Phone } from 'lucide-react'
+import { Loader2, Mail, Send } from 'lucide-react'
 
 export default function ContactPage() {
     const { toast } = useToast()
@@ -81,23 +81,6 @@ export default function ContactPage() {
                                 <span className="font-semibold block">General Info & Tips:</span>
                                 <a href="mailto:info@balijournal.com" className="text-blue-600 hover:underline">info@balijournal.com</a>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <Phone className="h-4 w-4" /> WhatsApp
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-sm">
-                            <p className="mb-2">For quick responses, chat with us on WhatsApp:</p>
-                            <Button variant="outline" className="w-full justify-start text-green-600 border-green-200 hover:bg-green-50" asChild>
-                                <a href="https://wa.me/6234567891011" target="_blank" rel="noopener noreferrer">
-                                    <Send className="h-4 w-4 mr-2" />
-                                    +62 345 6789 1011
-                                </a>
-                            </Button>
                         </CardContent>
                     </Card>
                 </div>

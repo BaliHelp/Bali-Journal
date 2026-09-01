@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { LEGAL_PAGES_LAST_UPDATED } from '@/lib/site-config'
 
 export const metadata: Metadata = {
     title: 'Terms & Conditions - Bali Journal',
@@ -12,7 +13,7 @@ export default function TermsConditionsPage() {
     return (
         <div className="container mx-auto px-4 py-12 max-w-4xl">
             <h1 className="text-3xl font-bold mb-6">Terms & Conditions</h1>
-            <p className="text-muted-foreground mb-8">Last Updated: {new Date().toLocaleDateString()}</p>
+            <p className="text-muted-foreground mb-8">Last Updated: {LEGAL_PAGES_LAST_UPDATED}</p>
 
             <div className="prose prose-slate dark:prose-invert max-w-none space-y-6">
                 <section>

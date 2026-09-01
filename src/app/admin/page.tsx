@@ -62,6 +62,7 @@ import {
   Shield,
   ShieldAlert,
   KeyRound,
+  IdCard,
   BarChart3,
   Settings,
   Search,
@@ -115,6 +116,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'Manajemen',
     items: [
       { value: 'users', label: 'Users', icon: Users },
+      { value: 'team', label: 'Team (Redaksi)', icon: IdCard },
       { value: 'reports', label: 'Reports', icon: BarChart3 },
     ],
   },
@@ -181,6 +183,16 @@ interface AdSlotRow {
   pricePerDay: number | null
   defaultDurationDays: number
   ads: { id: string; isActive: boolean }[]
+}
+
+interface TeamMemberRow {
+  id: string
+  name: string
+  role: string
+  bio: string | null
+  photoUrl: string | null
+  order: number
+  isActive: boolean
 }
 
 interface AdvertiserRow {
@@ -318,6 +330,7 @@ export default function MasterAdminDashboard() {
     }
   }
   const [reports, setReports] = useState<Report[]>([])
+  const [viewingReport, setViewingReport] = useState<Report | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [stats, setStats] = useState({
@@ -635,6 +648,100 @@ export default function MasterAdminDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  // Team (Redaksi) panel state - the masthead roster shown on About Us /
+  // Editorial Team, editable here so the public pages never need fake
+  // placeholder headcounts again.
+  const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [showTeamDialog, setShowTeamDialog] = useState(false)
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
+  const [teamForm, setTeamForm] = useState({ name: '', role: '', bio: '', photoUrl: '', order: 0, isActive: true })
+  const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false)
+
+  async function fetchTeamMembers() {
+    setTeamLoading(true)
+    try {
+      const res = await fetch('/api/admin/team')
+      const data = await res.json()
+      if (Array.isArray(data.members)) setTeamMembers(data.members)
+    } catch (err) {
+      console.error('Error fetching team members:', err)
+    } finally {
+      setTeamLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'team' && teamMembers.length === 0) {
+      fetchTeamMembers()
+    }
+  }, [activeTab])
+
+  function openAddTeamMember() {
+    setEditingTeamId(null)
+    setTeamForm({ name: '', role: '', bio: '', photoUrl: '', order: teamMembers.length, isActive: true })
+    setShowTeamDialog(true)
+  }
+
+  function openEditTeamMember(m: TeamMemberRow) {
+    setEditingTeamId(m.id)
+    setTeamForm({ name: m.name, role: m.role, bio: m.bio || '', photoUrl: m.photoUrl || '', order: m.order, isActive: m.isActive })
+    setShowTeamDialog(true)
+  }
+
+  async function handleTeamPhotoUpload(file: File) {
+    setUploadingTeamPhoto(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('label', teamForm.name || 'team-member')
+      const res = await fetch('/api/admin/upload-image', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to upload photo')
+      setTeamForm((f) => ({ ...f, photoUrl: data.url }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload photo')
+    } finally {
+      setUploadingTeamPhoto(false)
+    }
+  }
+
+  async function handleSaveTeamMember(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setFormSubmitting(true)
+    try {
+      const url = editingTeamId ? `/api/admin/team/${editingTeamId}` : '/api/admin/team'
+      const method = editingTeamId ? 'PATCH' : 'POST'
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(teamForm),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save team member')
+      setSuccess(editingTeamId ? 'Anggota tim diperbarui!' : 'Anggota tim ditambahkan!')
+      setShowTeamDialog(false)
+      fetchTeamMembers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save team member')
+    } finally {
+      setFormSubmitting(false)
+    }
+  }
+
+  async function handleDeleteTeamMember(id: string) {
+    if (!confirm('Hapus anggota tim ini?')) return
+    try {
+      const res = await fetch(`/api/admin/team/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete')
+      setSuccess('Anggota tim dihapus!')
+      fetchTeamMembers()
+    } catch {
+      setError('Failed to delete team member')
+    }
+  }
 
   // Articles tab: load the first month lazily, only once the tab is
   // actually opened - not on every dashboard visit.
@@ -1154,6 +1261,22 @@ export default function MasterAdminDashboard() {
       fetchAllData()
     } catch (err) {
       setError('Failed to update comment')
+    }
+  }
+
+  async function handleReportStatusChange(id: string, status: string) {
+    setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
+    try {
+      const res = await fetch(`/api/admin/reports/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) throw new Error('Failed to update')
+      setSuccess('Status laporan diperbarui!')
+    } catch {
+      setError('Failed to update report status')
+      fetchAllData()
     }
   }
 
@@ -2351,19 +2474,266 @@ export default function MasterAdminDashboard() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="team">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Team (Redaksi)</CardTitle>
+                    <CardDescription>Roster publik yang tampil di About Us dan halaman Editorial Team - kosong sampai diisi di sini, tidak ada data placeholder.</CardDescription>
+                  </div>
+                  <Button size="sm" onClick={openAddTeamMember}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tambah Anggota
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[70px]">Foto</TableHead>
+                      <TableHead>Nama</TableHead>
+                      <TableHead>Jabatan</TableHead>
+                      <TableHead className="hidden md:table-cell">Urutan</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {teamLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                          Memuat...
+                        </TableCell>
+                      </TableRow>
+                    ) : teamMembers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Belum ada anggota tim. Klik &quot;Tambah Anggota&quot; untuk mulai isi Redaksi.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      teamMembers.map((m) => (
+                        <TableRow key={m.id}>
+                          <TableCell>
+                            <div className="relative w-10 h-10 rounded-full overflow-hidden bg-muted">
+                              {m.photoUrl ? (
+                                <Image src={m.photoUrl} alt={m.name} fill sizes="40px" className="object-cover" />
+                              ) : (
+                                <div className="flex items-center justify-center h-full">
+                                  <IdCard className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">{m.name}</TableCell>
+                          <TableCell className="text-muted-foreground">{m.role}</TableCell>
+                          <TableCell className="hidden md:table-cell">{m.order}</TableCell>
+                          <TableCell>
+                            <Badge variant={m.isActive ? 'default' : 'outline'}>{m.isActive ? 'Tampil' : 'Disembunyikan'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => openEditTeamMember(m)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AsyncButton variant="ghost" size="icon" onClick={() => handleDeleteTeamMember(m.id)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </AsyncButton>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Dialog open={showTeamDialog} onOpenChange={setShowTeamDialog}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{editingTeamId ? 'Edit Anggota Tim' : 'Tambah Anggota Tim'}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSaveTeamMember} className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden bg-muted shrink-0">
+                      {teamForm.photoUrl ? (
+                        <Image src={teamForm.photoUrl} alt="" fill sizes="64px" className="object-cover" />
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <IdCard className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingTeamPhoto}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleTeamPhotoUpload(file)
+                        }}
+                      />
+                      {uploadingTeamPhoto && <p className="text-xs text-muted-foreground mt-1"><Loader2 className="h-3 w-3 animate-spin inline mr-1" />Mengunggah...</p>}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teamName">Nama *</Label>
+                    <Input id="teamName" value={teamForm.name} onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teamRole">Jabatan *</Label>
+                    <Input id="teamRole" value={teamForm.role} onChange={(e) => setTeamForm({ ...teamForm, role: e.target.value })} placeholder="Editor-in-Chief, Investigative Journalist, dll" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teamBio">Bio Singkat</Label>
+                    <Textarea id="teamBio" rows={3} value={teamForm.bio} onChange={(e) => setTeamForm({ ...teamForm, bio: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="teamOrder">Urutan Tampil</Label>
+                      <Input id="teamOrder" type="number" value={teamForm.order} onChange={(e) => setTeamForm({ ...teamForm, order: parseInt(e.target.value) || 0 })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="teamActive">Status</Label>
+                      <Select value={teamForm.isActive ? 'true' : 'false'} onValueChange={(v) => setTeamForm({ ...teamForm, isActive: v === 'true' })}>
+                        <SelectTrigger id="teamActive"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Tampil di situs</SelectItem>
+                          <SelectItem value="false">Disembunyikan</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setShowTeamDialog(false)}>Batal</Button>
+                    <Button type="submit" disabled={formSubmitting}>
+                      {formSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Simpan
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+
           <TabsContent value="reports">
             <Card>
               <CardHeader>
-                <CardTitle>Public Reports</CardTitle>
-                <CardDescription>User submitted reports on articles.</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Public Reports</CardTitle>
+                    <CardDescription>Laporan/tips yang dikirim publik lewat halaman Submit Report.</CardDescription>
+                  </div>
+                  <Input
+                    placeholder="Cari laporan..."
+                    className="max-w-xs"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="rounded-md border p-8 text-center text-muted-foreground">
-                  <p>Report management module coming soon.</p>
-                  <p className="text-sm mt-2">{reports.length} reports in database.</p>
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Judul</TableHead>
+                      <TableHead className="hidden lg:table-cell">Kategori</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="hidden lg:table-cell">Kontak</TableHead>
+                      <TableHead className="hidden md:table-cell">Tanggal</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reports.filter((r) => {
+                      const q = searchQuery.toLowerCase()
+                      return !q || r.title.toLowerCase().includes(q) || r.category.toLowerCase().includes(q)
+                    }).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Belum ada laporan masuk.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      reports.filter((r) => {
+                        const q = searchQuery.toLowerCase()
+                        return !q || r.title.toLowerCase().includes(q) || r.category.toLowerCase().includes(q)
+                      }).map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="max-w-xs">
+                            <p className="font-medium line-clamp-1">{r.title}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-2">{r.content}</p>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <Badge variant="outline">{r.category}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Select value={r.status} onValueChange={(v) => handleReportStatusChange(r.id, v)}>
+                              <SelectTrigger className="w-[120px] h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="PENDING">Pending</SelectItem>
+                                <SelectItem value="REVIEWED">Reviewed</SelectItem>
+                                <SelectItem value="ARCHIVED">Archived</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{r.sourceContact || '-'}</TableCell>
+                          <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                            {new Date(r.createdAt).toLocaleDateString('id-ID')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => setViewingReport(r)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
+
+            <Dialog open={!!viewingReport} onOpenChange={(open) => !open && setViewingReport(null)}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>{viewingReport?.title}</DialogTitle>
+                  <DialogDescription>
+                    {viewingReport?.category} - {viewingReport && new Date(viewingReport.createdAt).toLocaleString('id-ID')}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <p className="text-sm whitespace-pre-wrap">{viewingReport?.content}</p>
+                  {viewingReport?.sourceContact && (
+                    <p className="text-sm"><strong>Kontak:</strong> {viewingReport.sourceContact}</p>
+                  )}
+                  {viewingReport?.evidenceLinks && (
+                    <div>
+                      <p className="text-sm font-medium mb-1">Bukti/Link:</p>
+                      <div className="space-y-1">
+                        {(() => {
+                          try {
+                            const links: string[] = JSON.parse(viewingReport.evidenceLinks)
+                            return links.map((link, i) => (
+                              <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline block truncate">
+                                {link}
+                              </a>
+                            ))
+                          } catch {
+                            return <p className="text-sm text-muted-foreground">{viewingReport.evidenceLinks}</p>
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="ads">

@@ -17,6 +17,7 @@ const footerLinks = {
     ],
     company: [
       { href: '/about', label: 'About Us' },
+      { href: '/editorial-team', label: 'Editorial Team' },
       { href: '/transparency', label: 'Transparency' },
       { href: '/submit-report', label: 'Submit Report' },
       { href: '/contact', label: 'Contact' },
@@ -26,6 +27,9 @@ const footerLinks = {
       { href: '/privacy-policy', label: 'Privacy Policy' },
       { href: '/terms-conditions', label: 'Terms & Conditions' },
       { href: '/editorial-guidelines', label: 'Editorial Guidelines' },
+      { href: '/journalistic-code', label: 'Journalistic Code of Ethics' },
+      { href: '/cyber-media-guidelines', label: 'Cyber Media Guidelines' },
+      { href: '/disclaimer', label: 'Disclaimer' },
     ],
   },
   id: {
@@ -40,6 +44,7 @@ const footerLinks = {
     ],
     company: [
       { href: '/about', label: 'Tentang Kami' },
+      { href: '/editorial-team', label: 'Redaksi' },
       { href: '/transparency', label: 'Transparansi' },
       { href: '/submit-report', label: 'Kirim Laporan' },
       { href: '/contact', label: 'Kontak' },
@@ -49,6 +54,9 @@ const footerLinks = {
       { href: '/privacy-policy', label: 'Kebijakan Privasi' },
       { href: '/terms-conditions', label: 'Syarat & Ketentuan' },
       { href: '/editorial-guidelines', label: 'Pedoman Editorial' },
+      { href: '/journalistic-code', label: 'Kode Etik Jurnalistik' },
+      { href: '/cyber-media-guidelines', label: 'Pedoman Media Siber' },
+      { href: '/disclaimer', label: 'Disclaimer' },
     ],
   },
 }
@@ -202,7 +210,7 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Bali Journal. {t.copyright}
           </p>
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
             {links.legal.map((link) => (
               <Link
                 key={link.href}

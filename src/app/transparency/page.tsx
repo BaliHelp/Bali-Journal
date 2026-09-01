@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Shield, FileText, Users, Eye, CheckCircle, AlertTriangle } from 'lucide-react'
+import { COMPANY_NAME } from '@/lib/site-config'
 
 export const metadata = {
   title: 'Transparency - Bali Journal',
@@ -179,17 +180,19 @@ export default async function TransparencyPage() {
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <span>Ads & Sponsors</span>
-                <Badge>0%</Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <span>Reader Donations</span>
-                <Badge variant="secondary">100%</Badge>
+                <span>Ads</span>
+                <Badge variant="secondary">Display placements only</Badge>
               </div>
               <Separator />
               <p className="text-sm text-muted-foreground">
-                Bali Journal is an independent platform funded entirely by reader donations. 
-                We do not accept ads or sponsorships from third parties to maintain editorial independence.
+                Bali Journal is funded through paid advertising - banner and display placements from
+                vetted advertisers (see our <a href="/ads" className="text-primary hover:underline">Advertise
+                With Us</a> page). Advertising is a pure display placement, never editorial content, and
+                carries no influence over which stories we cover or how we report them.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                We do not accept sponsorships - arrangements that tie payment to editorial coverage,
+                endorsement, or political backing. Bali Journal is published by {COMPANY_NAME}.
               </p>
             </div>
           </CardContent>
@@ -205,8 +208,7 @@ export default async function TransparencyPage() {
               For questions about transparency or editorial claims:
             </p>
             <div className="space-y-1">
-              <p className="text-sm"><strong>Email:</strong> editorial@balijournal.com</p>
-              <p className="text-sm"><strong>Phone:</strong> +62 361 XXX XXXX</p>
+              <p className="text-sm"><strong>Email:</strong> info@balijournal.com</p>
               <p className="text-sm"><strong>Address:</strong> Denpasar, Bali, Indonesia</p>
             </div>
           </CardContent>

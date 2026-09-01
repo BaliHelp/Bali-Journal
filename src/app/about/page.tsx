@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Shield, Users, FileText, Target, Eye, Heart } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { db } from '@/lib/db'
 
 export const metadata = {
   title: 'About Us - Bali Journal',
@@ -12,13 +13,6 @@ export const metadata = {
     canonical: '/about',
   },
 }
-
-const teamMembers = [
-  { name: 'Investigation Team', role: 'Investigative Journalists', count: 5 },
-  { name: 'Editorial Team', role: 'Senior Editors', count: 3 },
-  { name: 'Legal Team', role: 'Legal Advisors', count: 2 },
-  { name: 'Technical Team', role: 'Developers & IT', count: 2 },
-]
 
 const values = [
   {
@@ -43,7 +37,12 @@ const values = [
   },
 ]
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const teamMembers = await db.teamMember.findMany({
+    where: { isActive: true },
+    orderBy: { order: 'asc' },
+  })
+
   return (
     <div className="py-12">
       <div className="container mx-auto max-w-4xl px-4">
@@ -106,17 +105,42 @@ export default function AboutPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {teamMembers.map((team) => (
-                <div key={team.name} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div>
-                    <p className="font-medium">{team.name}</p>
-                    <p className="text-sm text-muted-foreground">{team.role}</p>
+            {teamMembers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Team roster coming soon. See our{' '}
+                <Link href="/editorial-team" className="text-primary hover:underline">
+                  Editorial Team
+                </Link>{' '}
+                page for updates.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {teamMembers.slice(0, 6).map((member) => (
+                  <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-muted shrink-0">
+                      {member.photoUrl ? (
+                        <Image src={member.photoUrl} alt={member.name} fill sizes="40px" className="object-cover" />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-sm font-medium text-muted-foreground">
+                          {member.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">{member.name}</p>
+                      <p className="text-sm text-muted-foreground">{member.role}</p>
+                    </div>
                   </div>
-                  <Badge variant="secondary">{team.count} people</Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+            {teamMembers.length > 0 && (
+              <div className="mt-4 text-center">
+                <Link href="/editorial-team" className="text-sm text-primary hover:underline">
+                  View full Editorial Team →
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
 
