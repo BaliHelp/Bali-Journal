@@ -21,8 +21,8 @@ export const metadata: Metadata = {
     default: 'Bali Journal - Independent Investigative Journalism',
     template: '%s | Bali Journal',
   },
-  description: 'Bali\'s premier independent investigative journalism platform. Delivering evidence-based news on Tourism, Investment, Incidents, and Local affairs in Bali, Indonesia.',
-  keywords: ['Bali news', 'Investigative Journalism', 'Bali Tourism', 'Bali Investment', 'Canggu News', 'Bali Safety', 'Travel Advice Bali', 'Bali Journal'],
+  description: 'Bali News, updated daily: independent investigative journalism covering Tourism, Government, Investment, Incidents, and Local affairs across Bali, Indonesia - evidence-based reporting you can trust.',
+  keywords: ['Bali news', 'Bali news today', 'daily Bali news', 'Bali viral', 'news Bali', 'Investigative Journalism', 'Bali Tourism', 'Bali Investment', 'Bali Government', 'Canggu News', 'Bali Safety', 'Travel Advice Bali', 'Bali Journal'],
   // Root-level default: the homepage's own canonical. Every other route
   // (article, category, /news, /search, static pages) sets its own
   // canonical below/in its own metadata - without an explicit canonical
@@ -36,8 +36,14 @@ export const metadata: Metadata = {
   creator: 'Bali Journal Media',
   publisher: 'Bali Journal Media',
   icons: {
-    icon: '/Logo.webp',
-    apple: '/Logo.webp',
+    icon: [
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-48x48.png', sizes: '48x48', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: '/favicon.ico',
   },
   openGraph: {
     title: 'Bali Journal',
@@ -46,10 +52,10 @@ export const metadata: Metadata = {
     siteName: 'Bali Journal',
     images: [
       {
-        url: '/opengraph-image', // Dynamic OG Image
+        url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'Bali Journal Cover',
+        alt: 'Bali Journal - Investigative Journalism from Bali, Indonesia',
       },
     ],
     type: 'website',
@@ -59,7 +65,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Bali Journal',
     description: 'Independent news from Bali, Indonesia.',
-    images: ['/opengraph-image'],
+    images: ['/og-image.jpg'],
     creator: '@balijournal',
   },
   robots: {

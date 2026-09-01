@@ -16,7 +16,8 @@ import {
   MessageCircle
 } from 'lucide-react'
 import Link from 'next/link'
-import { ArticleJsonLd } from '@/components/seo/article-json-ld'
+import { ArticleJsonLd, BreadcrumbJsonLd } from '@/components/seo/article-json-ld'
+import { SITE_URL } from '@/lib/site-config'
 import { CommentSection } from '@/components/article/comment-section'
 import { EvidenceList } from '@/components/article/evidence-list'
 import { ArticleCard } from '@/components/article/article-card'
@@ -153,6 +154,16 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   return (
     <>
       <ArticleJsonLd article={article} />
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Home', url: SITE_URL },
+          {
+            name: article.category.charAt(0) + article.category.slice(1).toLowerCase(),
+            url: `${SITE_URL}/category/${article.category.toLowerCase()}`,
+          },
+          { name: article.title, url: `${SITE_URL}/article/${article.slug}` },
+        ]}
+      />
 
       <article className="py-8">
         <div className="container mx-auto max-w-7xl px-4">

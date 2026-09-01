@@ -33,13 +33,22 @@ const BALI_ADDRESS = {
   addressCountry: 'ID',
 }
 
+// Google's structured data spec requires `image` to be a fully-qualified
+// absolute URL - featuredImageUrl is stored as a site-relative path
+// (e.g. "/uploads/articles/foo.jpg"), which Next.js's own metadata API
+// auto-resolves against metadataBase for og:image, but a hand-written
+// JSON-LD <script> gets no such help and needs this done explicitly.
+function toAbsoluteUrl(url: string): string {
+  return url.startsWith('http') ? url : `${SITE_URL}${url}`
+}
+
 export function ArticleJsonLd({ article }: ArticleJsonLdProps) {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
     headline: article.title,
     description: article.excerpt,
-    image: article.featuredImageUrl ? [article.featuredImageUrl] : [],
+    image: article.featuredImageUrl ? [toAbsoluteUrl(article.featuredImageUrl)] : [],
     datePublished: article.publishedAt?.toISOString(),
     dateModified: (article.updatedAt ?? article.publishedAt)?.toISOString(),
     author: {
@@ -53,7 +62,9 @@ export function ArticleJsonLd({ article }: ArticleJsonLdProps) {
       address: BALI_ADDRESS,
       logo: {
         '@type': 'ImageObject',
-        url: `${SITE_URL}/logo.svg`,
+        url: `${SITE_URL}/icon-512.png`,
+        width: 512,
+        height: 512,
       },
     },
     mainEntityOfPage: {
@@ -93,13 +104,33 @@ export function WebsiteJsonLd() {
   )
 }
 
+export function BreadcrumbJsonLd({ items }: { items: { name: string; url: string }[] }) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: item.url,
+    })),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  )
+}
+
 export function OrganizationJsonLd() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'NewsMediaOrganization',
     name: SITE_NAME,
     url: SITE_URL,
-    logo: `${SITE_URL}/logo.svg`,
+    logo: `${SITE_URL}/icon-512.png`,
     parentOrganization: PARENT_ORGANIZATION,
     address: BALI_ADDRESS,
     areaServed: {
@@ -114,7 +145,7 @@ export function OrganizationJsonLd() {
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'customer service',
-      email: `kontak@${SITE_DOMAIN}`,
+      email: `info@${SITE_DOMAIN}`,
       areaServed: 'ID',
     },
   }

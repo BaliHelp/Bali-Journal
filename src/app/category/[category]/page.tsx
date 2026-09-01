@@ -2,6 +2,8 @@ import { db } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import { ArticleCard } from '@/components/article/article-card'
 import { Badge } from '@/components/ui/badge'
+import { BreadcrumbJsonLd } from '@/components/seo/article-json-ld'
+import { SITE_URL } from '@/lib/site-config'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>
@@ -85,6 +87,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   return (
     <div className="py-8">
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Home', url: SITE_URL },
+          { name: categoryLabels[category], url: `${SITE_URL}/category/${categorySlug}` },
+        ]}
+      />
       <div className="container mx-auto max-w-7xl px-4">
         {/* Header */}
         <div className="mb-8">
