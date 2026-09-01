@@ -71,7 +71,8 @@ const SHARED_FORMATTING_RULES = `
 - The "Inverted Pyramid" and "5W1H" (Who, What, Where, When, Why, How) are internal structuring guidance for YOU, the writer, regardless of which style below you're using. NEVER print them, or any other planning/section label, as visible text in the article. Forbidden as headings or labels - none of these, or anything with the same generic/report-template flavor, may appear anywhere in the output: "LEAD", "THE FACTS", "KEY QUOTES", "BACKGROUND/CONTEXT", "IMPACT", "OPPOSING VIEWS", "CONCLUSION", "Bali Journal Analysis", "Main Data & Facts", "The Key Players", "Chronology & Activities", "Public & Economic Impact", "Key Takeaways". A real news article never announces its own structure and never reads like a corporate report or a listicle.
 - Subheadings are optional. Use at most 2-4, only in pieces long enough to need them. Each must be a short, specific, content-derived phrase, never a generic scaffolding word.
 - Formatting: HTML only. Use <p> for every paragraph and <h3> for the rare subheading. No markdown syntax (no **, ##, etc.) anywhere in the output.
-- LENGTH IS MANDATORY, NOT A SUGGESTION: write a minimum of 600 words and aim for 800-1000. That means at least 8-10 substantial paragraphs (3-5 sentences each) covering the lead, supporting facts with specific numbers/names/places, at least two quotes from different people, background, and consequences/next steps. A 3-paragraph article is a FAILED response.
+- LENGTH IS MANDATORY, NOT A SUGGESTION: write a minimum of 600 words and aim for 800-1000. That means at least 8-10 substantial paragraphs (3-5 sentences each) covering the lead, supporting facts with specific numbers/names/places, background, and consequences/next steps. A 3-paragraph article is a FAILED response.
+- QUOTES - FABRICATION IS FORBIDDEN, NO EXCEPTIONS: only use a quote that is explicitly present in the source material you were given (word-for-word or a faithful paraphrase clearly marked as such), attributed to whoever the source actually attributes it to. NEVER invent a quote and attribute it to a real, named, identifiable person (a government official, executive, celebrity, or anyone else) who did not actually say it in the source material - this is a fabrication that can defame a real person and is a hard legal/editorial violation, not a style choice. If the source material contains no quotable statement from anyone, write the entire article without a single quote rather than inventing one - a quote-free article is correct; a fabricated quote is not. It is fine to describe what an authority/agency DID ("the Ministry announced...", "immigration authorities imposed...") without ever quoting a specific person who wasn't quoted in the source.
 `.trim()
 
 export const WRITING_STYLES: WritingStyle[] = [
@@ -81,7 +82,7 @@ export const WRITING_STYLES: WritingStyle[] = [
 WRITING STYLE: Inverted Pyramid (Associated Press / Reuters house style).
 - Lead paragraph packs the single most important fact first - who, what, where, when, in one or two sentences a reader could stop after and still understand the core news.
 - Each following paragraph descends in importance: supporting facts, then quotes, then background, then broader context/consequences last.
-- Tone: neutral, factual, third-person, minimal adjectives. Quotes woven naturally into the prose ("... said Wayan Koster, Governor of Bali."), never under a "Quotes" heading.
+- Tone: neutral, factual, third-person, minimal adjectives. If the source material has a real quote, weave it naturally into the prose ("... said [the actual name/title from the source]."), never under a "Quotes" heading. Never invent the name in that example - it is illustrative of PLACEMENT only, not a name to reuse.
 ${SHARED_FORMATTING_RULES}
 `.trim(),
     },
@@ -112,7 +113,7 @@ ${SHARED_FORMATTING_RULES}
         rules: `
 WRITING STYLE: On-the-Ground Reportage (reporter-at-the-scene voice).
 - Write as if the reporter is physically present at the location described, grounding the piece in specific, named places (streets, neighborhoods, buildings) from the first paragraph.
-- Weave direct quotes in earlier and more frequently than the other styles - at least one quote within the first 3 paragraphs, from someone directly affected or directly involved, not just an official spokesperson.
+- If the source material contains a quote, weave it in earlier and more frequently than the other styles - within the first 3 paragraphs if possible, from whoever the source actually quotes (directly affected residents/workers read especially well in this style, not just an official spokesperson). If the source has no quote at all, do not invent one - carry the same on-the-ground sensory detail through unquoted observational prose instead.
 - Include local color and specific sensory/observational detail (what a location looks/sounds like right now) as texture around the facts, not as decoration replacing them.
 - Keep sentences slightly shorter and more direct than the narrative-feature style - this is urgent, immediate reporting, not a slow-build magazine piece.
 ${SHARED_FORMATTING_RULES}

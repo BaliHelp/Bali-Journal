@@ -272,6 +272,24 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             dangerouslySetInnerHTML={{ __html: article.content }}
           />
 
+          {/* Source Reference - shown for articles rewritten from an
+              external source (article.sourceUrl), so readers can verify
+              against the original reporting. rel=nofollow since this is
+              attribution, not an editorial endorsement/backlink. */}
+          {article.sourceUrl && (
+            <p className="mb-8 text-sm text-muted-foreground border-l-2 pl-4">
+              <LangText en="Source" id="Sumber" />:{' '}
+              <a
+                href={article.sourceUrl}
+                target="_blank"
+                rel="nofollow noopener noreferrer"
+                className="underline hover:text-foreground break-all"
+              >
+                {article.sourceUrl}
+              </a>
+            </p>
+          )}
+
           <AdSlot position="IN_ARTICLE" className="my-8" />
 
           <Separator className="my-8" />
