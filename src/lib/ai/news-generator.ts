@@ -213,7 +213,8 @@ export async function generateNewsArticles(count: number = 3, authorId: string, 
             if (riskAnalysis.riskLevel === 'CRITICAL') {
                 const repair = await repairCriticalRisk(
                     { title: generated.title, excerpt: generated.excerpt, content: generated.content },
-                    riskAnalysis
+                    riskAnalysis,
+                    category
                 )
                 generated = { ...generated, title: repair.title, excerpt: repair.excerpt, content: repair.content }
                 riskAnalysis = repair.riskAnalysis

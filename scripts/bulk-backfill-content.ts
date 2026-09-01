@@ -232,7 +232,8 @@ async function main() {
             if (riskAnalysis.riskLevel === 'CRITICAL') {
                 const repair = await repairCriticalRisk(
                     { title: article.title, excerpt: article.excerpt, content: article.content },
-                    riskAnalysis
+                    riskAnalysis,
+                    article.category
                 )
                 finalArticleData = repair
                 finalRiskAnalysis = repair.riskAnalysis

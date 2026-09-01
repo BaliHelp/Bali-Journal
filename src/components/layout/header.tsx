@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -205,6 +205,7 @@ export function Header() {
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="right" className="w-80">
+                    <SheetTitle className="sr-only">{t.categories}</SheetTitle>
                     <nav className="flex flex-col space-y-4 mt-8">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-muted-foreground">

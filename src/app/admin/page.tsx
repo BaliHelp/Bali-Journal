@@ -1409,13 +1409,19 @@ export default function MasterAdminDashboard() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to check legal risk')
 
-      updateArticleInLists(id, { riskLevel: data.after.riskLevel, riskScore: data.after.riskScore })
+      updateArticleInLists(id, {
+        riskLevel: data.after.riskLevel,
+        riskScore: data.after.riskScore,
+        ...(data.published ? { status: 'PUBLISHED', publishedAt: new Date().toISOString() } : {}),
+      })
       setRiskCheckResult({ before: data.before.riskLevel, after: data.after.riskLevel, resolved: data.resolved, wasRewritten: data.wasRewritten })
 
-      if (!data.wasRewritten) {
-        setSuccess(`Risiko saat ini: ${data.after.riskLevel} (${data.after.riskScore}). Tidak ada konten CRITICAL yang perlu diperbaiki.`)
+      if (data.published) {
+        setSuccess(`Risiko turun ke ${data.after.riskLevel} dan semua syarat terpenuhi - artikel langsung dipublikasikan!`)
+      } else if (!data.wasRewritten) {
+        setSuccess(`Risiko saat ini: ${data.after.riskLevel} (${data.after.riskScore}). Tidak ada konten CRITICAL yang perlu diperbaiki.${data.missingRequirements?.length ? ' Belum bisa publish: ' + data.missingRequirements.join(', ') : ''}`)
       } else if (data.resolved) {
-        setSuccess(`Risiko berhasil diturunkan dari ${data.before.riskLevel} ke ${data.after.riskLevel}. Artikel sudah bisa dipublikasikan.`)
+        setSuccess(`Risiko berhasil diturunkan dari ${data.before.riskLevel} ke ${data.after.riskLevel}.${data.missingRequirements?.length ? ' Belum bisa publish: ' + data.missingRequirements.join(', ') : ' Artikel sudah bisa dipublikasikan.'}`)
       } else {
         setError(`Masih CRITICAL (${data.after.riskScore}) setelah 3 percobaan perbaikan - perlu diedit manual.`)
       }
