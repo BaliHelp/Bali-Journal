@@ -124,6 +124,10 @@ model Article {
   // Yandex, etc. - see src/lib/indexnow.ts) - null means "not submitted
   // yet", picked up by the indexnow-submit cron.
   indexNowSubmittedAt DateTime?
+  // Set once this article has been included in a newsletter digest sent to
+  // subscribers (see src/app/api/cron/newsletter-notify/route.ts) - null
+  // means "not notified yet".
+  newsletterSentAt    DateTime?
   authorId            String
   author              User            @relation(fields: [authorId], references: [id])
   evidences           Evidence[]

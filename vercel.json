@@ -11,6 +11,10 @@
         {
             "path": "/api/cron/indexnow-submit",
             "schedule": "*/15 * * * *"
+        },
+        {
+            "path": "/api/cron/newsletter-notify",
+            "schedule": "*/30 * * * *"
         }
     ]
 }

@@ -71,6 +71,11 @@ const translations = {
     emailPlaceholder: 'Your Email',
     copyright: 'All rights reserved.',
     tagline: 'Investigative Journalism',
+    subscribing: 'Subscribing...',
+    subscribeSuccess: 'Subscribed! Check your inbox.',
+    subscribeAlready: 'You are already subscribed.',
+    subscribeError: 'Failed to subscribe. Try again.',
+    emailUs: 'Or email us directly:',
   },
   id: {
     description: 'Platform jurnalisme investigasi independen untuk Bali. Menyajikan berita berbasis bukti dengan standar etika jurnalisme tinggi.',
@@ -81,6 +86,11 @@ const translations = {
     emailPlaceholder: 'Email Anda',
     copyright: 'Hak cipta dilindungi.',
     tagline: 'Jurnalisme Investigasi',
+    subscribing: 'Mendaftarkan...',
+    subscribeSuccess: 'Berhasil berlangganan! Cek inbox kamu.',
+    subscribeAlready: 'Kamu sudah berlangganan.',
+    subscribeError: 'Gagal berlangganan. Coba lagi.',
+    emailUs: 'Atau email kami langsung:',
   },
 }
 
@@ -98,6 +108,27 @@ function getSavedLang(): 'en' | 'id' {
 
 export function Footer() {
   const [lang, setLang] = useState<'en' | 'id'>('en')
+  const [subscribeEmail, setSubscribeEmail] = useState('')
+  const [subscribeState, setSubscribeState] = useState<'idle' | 'loading' | 'success' | 'already' | 'error'>('idle')
+
+  async function handleSubscribe(e: React.FormEvent) {
+    e.preventDefault()
+    if (!subscribeEmail.trim() || subscribeState === 'loading') return
+    setSubscribeState('loading')
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: subscribeEmail.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setSubscribeState(data.alreadySubscribed ? 'already' : 'success')
+      setSubscribeEmail('')
+    } catch {
+      setSubscribeState('error')
+    }
+  }
 
   useEffect(() => {
     setLang(getSavedLang())
@@ -189,19 +220,43 @@ export function Footer() {
             <p className="text-sm text-muted-foreground mb-4">
               {t.newsletterDesc}
             </p>
-            <form className="flex space-x-2">
+            <form className="flex space-x-2" onSubmit={handleSubscribe}>
               <input
                 type="email"
+                required
+                value={subscribeEmail}
+                onChange={(e) => setSubscribeEmail(e.target.value)}
                 placeholder={t.emailPlaceholder}
-                className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+                disabled={subscribeState === 'loading'}
+                className="flex-1 px-3 py-2 text-sm border rounded-md bg-background disabled:opacity-60"
               />
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors"
+                disabled={subscribeState === 'loading'}
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60"
               >
                 <Mail className="h-4 w-4" />
               </button>
             </form>
+            {subscribeState === 'success' && (
+              <p className="text-xs text-green-600 mt-2">{t.subscribeSuccess}</p>
+            )}
+            {subscribeState === 'already' && (
+              <p className="text-xs text-muted-foreground mt-2">{t.subscribeAlready}</p>
+            )}
+            {subscribeState === 'error' && (
+              <p className="text-xs text-destructive mt-2">{t.subscribeError}</p>
+            )}
+
+            {/* Direct contact email - shown right below the newsletter
+                field per explicit request, so visitors can reach out
+                without needing the /contact form. */}
+            <p className="text-xs text-muted-foreground mt-3">
+              {t.emailUs}{' '}
+              <a href="mailto:info@balijournal.com" className="underline hover:text-foreground">
+                info@balijournal.com
+              </a>
+            </p>
           </div>
         </div>
 
