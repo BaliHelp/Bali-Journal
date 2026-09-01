@@ -1,21 +1,24 @@
-import fs from 'fs/promises'
-import path from 'path'
 import sharp from 'sharp'
+import { uploadImage } from '@/lib/storage/upload-image'
 
 /**
- * Media storage for ad creatives - separate upload dir from article images
- * (public/uploads/ads) since ads can be video, unlike anything else in the
- * image pipeline. Images get the same WebP conversion as article photos
- * (image-service.ts); video is stored as-is (webm/mp4), no server-side
- * transcoding - not worth the complexity for admin-only uploads, and the
- * browser will simply refuse to play an unsupported codec if one slips
- * through, it's not a security issue.
+ * Media storage for ad creatives and advertiser proof uploads - images get
+ * the same WebP conversion as article photos; video/PDF are stored as-is
+ * (no server-side transcoding - not worth the complexity for admin-only
+ * uploads, and the browser will simply refuse to play an unsupported codec
+ * if one slips through, it's not a security issue).
+ *
+ * Uploads go through the shared cloud storage helper (Supabase Storage,
+ * Vercel Blob fallback - src/lib/storage/upload-image.ts), NOT local disk.
+ * This used to write to public/uploads/ads and public/uploads/proofs on
+ * local disk, which is broken on Vercel the same way article images were
+ * (read-only filesystem at runtime, folder gitignored anyway) - fixed
+ * alongside that bug, 2026-09-01.
  */
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'ads')
-const PUBLIC_PREFIX = '/uploads/ads'
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // 8MB
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024 // 25MB - short looped ad clips only
+const MAX_PROOF_BYTES = 8 * 1024 * 1024 // 8MB
 const WEBP_QUALITY = 85
 
 const ALLOWED_VIDEO_TYPES = new Set(['video/webm', 'video/mp4'])
@@ -38,33 +41,30 @@ export async function storeAdMedia(
     file: File,
     label: string
 ): Promise<{ url: string; mediaType: 'IMAGE' | 'VIDEO' } | { error: string }> {
-    await fs.mkdir(UPLOAD_DIR, { recursive: true })
     const base = safeBaseName(label)
 
     if (file.type.startsWith('image/')) {
         if (file.size > MAX_IMAGE_BYTES) return { error: 'Image too large (max 8MB)' }
         const buffer = Buffer.from(await file.arrayBuffer())
         const webp = await sharp(buffer).webp({ quality: WEBP_QUALITY }).toBuffer()
-        const fileName = `${base}-${randomSuffix()}.webp`
-        await fs.writeFile(path.join(UPLOAD_DIR, fileName), webp)
-        return { url: `${PUBLIC_PREFIX}/${fileName}`, mediaType: 'IMAGE' }
+        const fileName = `ads/${base}-${randomSuffix()}.webp`
+        const result = await uploadImage(webp, 'image/webp', fileName)
+        if (!result) return { error: 'Upload failed - storage unavailable' }
+        return { url: result.url, mediaType: 'IMAGE' }
     }
 
     if (ALLOWED_VIDEO_TYPES.has(file.type)) {
         if (file.size > MAX_VIDEO_BYTES) return { error: 'Video too large (max 25MB)' }
         const buffer = Buffer.from(await file.arrayBuffer())
         const ext = file.type === 'video/webm' ? 'webm' : 'mp4'
-        const fileName = `${base}-${randomSuffix()}.${ext}`
-        await fs.writeFile(path.join(UPLOAD_DIR, fileName), buffer)
-        return { url: `${PUBLIC_PREFIX}/${fileName}`, mediaType: 'VIDEO' }
+        const fileName = `ads/${base}-${randomSuffix()}.${ext}`
+        const result = await uploadImage(buffer, file.type, fileName)
+        if (!result) return { error: 'Upload failed - storage unavailable' }
+        return { url: result.url, mediaType: 'VIDEO' }
     }
 
     return { error: 'File must be an image, or a .webm/.mp4 video' }
 }
-
-const PROOF_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'proofs')
-const PROOF_PUBLIC_PREFIX = '/uploads/proofs'
-const MAX_PROOF_BYTES = 8 * 1024 * 1024 // 8MB
 
 /**
  * Bank transfer proof uploads (advertiser self-service payment flow) - images
@@ -77,22 +77,23 @@ export async function storeProofFile(
 ): Promise<{ url: string } | { error: string }> {
     if (file.size > MAX_PROOF_BYTES) return { error: 'File too large (max 8MB)' }
 
-    await fs.mkdir(PROOF_UPLOAD_DIR, { recursive: true })
     const base = safeBaseName(label)
 
     if (file.type.startsWith('image/')) {
         const buffer = Buffer.from(await file.arrayBuffer())
         const webp = await sharp(buffer).webp({ quality: WEBP_QUALITY }).toBuffer()
-        const fileName = `${base}-${randomSuffix()}.webp`
-        await fs.writeFile(path.join(PROOF_UPLOAD_DIR, fileName), webp)
-        return { url: `${PROOF_PUBLIC_PREFIX}/${fileName}` }
+        const fileName = `proofs/${base}-${randomSuffix()}.webp`
+        const result = await uploadImage(webp, 'image/webp', fileName)
+        if (!result) return { error: 'Upload failed - storage unavailable' }
+        return { url: result.url }
     }
 
     if (file.type === 'application/pdf') {
         const buffer = Buffer.from(await file.arrayBuffer())
-        const fileName = `${base}-${randomSuffix()}.pdf`
-        await fs.writeFile(path.join(PROOF_UPLOAD_DIR, fileName), buffer)
-        return { url: `${PROOF_PUBLIC_PREFIX}/${fileName}` }
+        const fileName = `proofs/${base}-${randomSuffix()}.pdf`
+        const result = await uploadImage(buffer, 'application/pdf', fileName)
+        if (!result) return { error: 'Upload failed - storage unavailable' }
+        return { url: result.url }
     }
 
     return { error: 'File must be an image or a PDF' }

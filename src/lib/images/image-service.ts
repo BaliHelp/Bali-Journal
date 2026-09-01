@@ -1,27 +1,31 @@
-import fs from 'fs/promises'
-import path from 'path'
+import { uploadImage } from '@/lib/storage/upload-image'
 
 /**
  * Centralised image pipeline for Bali Journal.
  *
  * Generates an image via an external generator (Pollinations -> LoremFlickr
  * fallback), VERIFIES the binary response (content-type + minimum size),
- * stores the file under public/uploads/articles and returns a STABLE LOCAL
- * url (e.g. "/uploads/articles/foo-bar-123.jpg").
+ * uploads it to persistent cloud storage (Supabase Storage, Vercel Blob
+ * fallback - see src/lib/storage/upload-image.ts) and returns a STABLE
+ * public url.
  *
  * Articles therefore never store fragile third-party hotlinks again —
- * once generated, the image lives on our own server.
+ * once generated, the image lives in our own storage.
+ *
+ * NOTE: this used to write to public/uploads/articles/ on local disk. That
+ * silently broke every article photo on Vercel (serverless functions have a
+ * read-only filesystem at runtime, and the folder was gitignored anyway so
+ * nothing written there ever reached production) - confirmed via a live
+ * deploy where every image 404'd. Fixed 2026-09-01.
  */
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'articles')
-const PUBLIC_PREFIX = '/uploads/articles'
 const BROWSER_UA =
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 const MIN_IMAGE_BYTES = 5000 // anything smaller is almost certainly an error page
 const DOWNLOAD_TIMEOUT_MS = 45_000 // generators can legitimately be slow
 
 export interface StoredImage {
-    /** Local web path ("/uploads/articles/...") or null if every source failed */
+    /** Public storage URL (Supabase Storage or Vercel Blob), or null if every source failed */
     localPath: string | null
     /** Human-readable provenance stored in Article.imageSource */
     source: string
@@ -290,13 +294,12 @@ async function downloadImage(
     }
 }
 
-/** Writes the image to disk and returns its public web path. Exported so upload endpoints (e.g. manual admin image uploads) can reuse the same storage convention as AI-generated images. */
+/** Uploads the image to persistent cloud storage and returns its public URL. Exported so upload endpoints (e.g. manual admin image uploads) can reuse the same storage convention as AI-generated images. Throws if both storage backends fail. */
 export async function persistImage(
     buffer: Buffer,
     contentType: string,
     baseName: string
 ): Promise<string> {
-    await fs.mkdir(UPLOAD_DIR, { recursive: true })
     const safe =
         baseName
             .toLowerCase()
@@ -304,8 +307,9 @@ export async function persistImage(
             .replace(/(^-|-$)/g, '')
             .slice(0, 80) || 'image'
     const fileName = `${safe}-${randomSeed().toString(36)}.${extensionFor(contentType)}`
-    await fs.writeFile(path.join(UPLOAD_DIR, fileName), buffer)
-    return `${PUBLIC_PREFIX}/${fileName}`
+    const result = await uploadImage(buffer, contentType, fileName)
+    if (!result) throw new Error('Both Supabase Storage and Vercel Blob uploads failed')
+    return result.url
 }
 
 // ---------------------------------------------------------------------------

@@ -87,6 +87,22 @@ const nextConfig: NextConfig = {
         hostname: 'loremflickr.co',
         pathname: '/**',
       },
+      {
+        // Supabase Storage - primary article/ad image host (see
+        // src/lib/storage/upload-image.ts). Project-specific hostname, not
+        // a wildcard, since NEXT_PUBLIC_SUPABASE_URL is a single fixed
+        // project for this app.
+        protocol: 'https',
+        hostname: 'upmuvcahgmzuztdhdzap.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        // Vercel Blob - fallback storage host when Supabase Storage upload
+        // fails (redundancy, see src/lib/storage/upload-image.ts).
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+        pathname: '/**',
+      },
     ],
   },
 };
