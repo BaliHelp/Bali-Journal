@@ -92,6 +92,7 @@ import { AdminChatWidget } from '@/components/admin/chat-widget'
 import { AgentStatusCard } from '@/components/admin/agent-status-card'
 import { SystemHealthCard } from '@/components/admin/system-health-card'
 import { ScheduleCard } from '@/components/admin/schedule-card'
+import { ImageCropDialog } from '@/components/admin/image-crop-dialog'
 
 interface NavItem {
   value: string
@@ -399,6 +400,9 @@ export default function MasterAdminDashboard() {
   // title (standard "slug follows title until touched" pattern).
   const [slugTouched, setSlugTouched] = useState(false)
   const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
+  // File picked from "Upload Gambar dari Komputer" waiting to be cropped to
+  // 16:9 before it's actually uploaded - see ImageCropDialog.
+  const [pendingFeaturedImageFile, setPendingFeaturedImageFile] = useState<File | null>(null)
   const [statDialog, setStatDialog] = useState<'articles' | 'comments' | 'risk' | 'users' | null>(null)
   const [editingArticle, setEditingArticle] = useState<Article | null>(null)
   const [showArticleDialog, setShowArticleDialog] = useState(false)
@@ -2038,7 +2042,7 @@ export default function MasterAdminDashboard() {
                                   disabled={uploadingFeaturedImage}
                                   onChange={(e) => {
                                     const file = e.target.files?.[0]
-                                    if (file) handleFeaturedImageUpload(file)
+                                    if (file) setPendingFeaturedImageFile(file)
                                     e.target.value = ''
                                   }}
                                 />
@@ -2056,6 +2060,11 @@ export default function MasterAdminDashboard() {
                                   )}
                                   Upload Gambar dari Komputer
                                 </Button>
+                                <ImageCropDialog
+                                  file={pendingFeaturedImageFile}
+                                  onClose={() => setPendingFeaturedImageFile(null)}
+                                  onCropComplete={(croppedFile) => handleFeaturedImageUpload(croppedFile)}
+                                />
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="featuredImageAlt">Image Alt Text *</Label>
