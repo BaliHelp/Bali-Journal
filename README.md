@@ -1,4 +1,4 @@
-# 🚀 NewsBali
+# 🚀 Bali Journal
 
 A modern, production-ready news web application built with cutting-edge technologies. Developed and maintained by [indodesign.website](https://indodesign.website).
 
