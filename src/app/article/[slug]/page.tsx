@@ -9,10 +9,8 @@ import {
   User,
   Clock,
   Eye,
-  FileText,
   Shield,
-  AlertTriangle,
-  CheckCircle,
+  TrendingUp,
   MessageCircle
 } from 'lucide-react'
 import Link from 'next/link'
@@ -26,7 +24,6 @@ import { ShareMenu } from '@/components/article/share-menu'
 import { AdSlot, AdMedia, getActiveAd } from '@/components/ads/ad-slot'
 import { LangText } from '@/components/i18n/lang-text'
 import { CategoryLabel } from '@/components/i18n/category-label'
-import { RiskLabel } from '@/components/i18n/risk-label'
 import { ArticleDate } from '@/components/article/article-date'
 import type { Category } from '@prisma/client'
 
@@ -95,12 +92,29 @@ const getOtherCategoryArticles = cache(async (excludeId: string, excludeCategory
   return results.filter((a): a is NonNullable<typeof a> => a !== null)
 })
 
-const riskLevelColors: Record<string, string> = {
-  LOW: 'bg-green-500',
-  MEDIUM: 'bg-yellow-500',
-  HIGH: 'bg-orange-500',
-  CRITICAL: 'bg-red-500',
-}
+/**
+ * Replaces the old "Risk Level / Verification / Supporting Evidence" cards
+ * (removed 2026-09-02) - those showed internal editorial/legal metadata
+ * that's meaningless to readers and, worse, always read "0 of 0 evidence
+ * verified" / "0 documents" (confirmed: literally every one of the 128
+ * published articles has zero Evidence rows - AI-generated content never
+ * populates that table), which undermines trust rather than building it.
+ * Real, useful data instead: the 3 most-viewed articles site-wide
+ * (viewCount - see the Metrics panel work), clickable straight to the
+ * article.
+ */
+const getPopularArticles = cache(async (excludeId: string) => {
+  return db.article.findMany({
+    where: { status: 'PUBLISHED', id: { not: excludeId } },
+    orderBy: { viewCount: 'desc' },
+    take: 3,
+    select: {
+      id: true, title: true, slug: true, excerpt: true, category: true,
+      featuredImageUrl: true, featuredImageAlt: true, publishedAt: true,
+      viewCount: true, aiAssisted: true, author: { select: { name: true } },
+    },
+  })
+})
 
 // Bing (and Google similarly) flags meta descriptions outside a 25-160
 // char range as an SEO error ("Meta Description too long or too short") -
@@ -185,6 +199,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   await incrementViewCount(article.id)
 
   const otherCategoryArticles = await getOtherCategoryArticles(article.id, article.category)
+  const popularArticles = await getPopularArticles(article.id)
   const [leftAd, leftBottomAd, rightTopAd, rightBottomAd] = await Promise.all([
     getActiveAd('ARTICLE_LEFT', 'DESKTOP'),
     getActiveAd('ARTICLE_LEFT_BOTTOM', 'DESKTOP'),
@@ -346,37 +361,24 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             </>
           )}
 
-          {/* Article Metadata */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="p-4 rounded-lg border bg-muted/30">
+          {/* Artikel Terpopuler - replaces the old Risk Level / Verification
+              / Supporting Evidence cards (internal editorial metadata that
+              meant nothing to readers and always read "0 of 0 verified" -
+              see getPopularArticles() comment above). Real engagement data
+              instead: the 3 most-viewed articles site-wide, clickable. */}
+          {popularArticles.length > 0 && (
+            <div className="mb-8 rounded-lg border bg-muted/30 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium"><LangText en="Risk Level" id="Tingkat Risiko" /></span>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium"><LangText en="Most Popular" id="Artikel Terpopuler" /></span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${riskLevelColors[article.riskLevel]}`} />
-                <span className="font-semibold">
-                  <RiskLabel level={article.riskLevel} />
-                </span>
+              <div className="divide-y">
+                {popularArticles.map((a) => (
+                  <ArticleCard key={a.id} article={a} variant="compact" />
+                ))}
               </div>
             </div>
-            <div className="p-4 rounded-lg border bg-muted/30">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium"><LangText en="Verification" id="Verifikasi" /></span>
-              </div>
-              <span className="font-semibold">
-                {article.evidences.filter(e => e.verified).length} <LangText en="of" id="dari" /> {article.evidences.length} <LangText en="evidence verified" id="bukti terverifikasi" />
-              </span>
-            </div>
-            <div className="p-4 rounded-lg border bg-muted/30">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium"><LangText en="Supporting Evidence" id="Bukti Pendukung" /></span>
-              </div>
-              <span className="font-semibold">{article.evidences.length} <LangText en="documents" id="dokumen" /></span>
-            </div>
-          </div>
+          )}
 
           {/* Share Actions */}
           <ArticleActions articleId={article.id} slug={article.slug} title={article.title} excerpt={article.excerpt} initialLikeCount={article.likeCount} />
