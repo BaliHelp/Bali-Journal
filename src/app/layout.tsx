@@ -10,7 +10,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { AdSlot } from '@/components/ads/ad-slot'
 import { PlaceAdsCTA } from '@/components/ads/place-ads-cta'
 import { OrganizationJsonLd, WebsiteJsonLd } from '@/components/seo/article-json-ld'
-import { db } from '@/lib/db'
+import { getBreakingNewsArticles } from '@/lib/breaking-news'
 
 // BUG FIX (2026-09-02): BreakingNews used to be a pure client component
 // that server-rendered stale hardcoded fallback headlines (from the
@@ -23,15 +23,10 @@ import { db } from '@/lib/db'
 // every page already goes through removes both problems: no separate
 // request, no flash, and it's real-time accurate on every full page load
 // (this layout has no revalidate/cache directive, so it runs fresh per
-// request like the rest of this project's dynamic pages).
-const getBreakingNews = cache(async () => {
-  return db.article.findMany({
-    where: { status: 'PUBLISHED' },
-    orderBy: { publishedAt: 'desc' },
-    take: 5,
-    select: { id: true, title: true, slug: true, category: true },
-  })
-})
+// request like the rest of this project's dynamic pages). Scoped to the
+// last 7 days (src/lib/breaking-news.ts) per explicit request - only
+// genuinely recent headlines should carry a "BREAKING" label.
+const getBreakingNews = cache(getBreakingNewsArticles)
 
 const inter = Inter({
   variable: '--font-inter',
