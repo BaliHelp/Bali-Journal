@@ -245,7 +245,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                   <LangText en="Verified" id="Terverifikasi" />
                 </Badge>
               </div>
-              <ShareMenu title={article.title} url={`${SITE_URL}/article/${article.slug}`} />
+              <ShareMenu articleId={article.id} title={article.title} url={`${SITE_URL}/article/${article.slug}`} />
             </div>
 
             <h1 className="text-3xl md:text-4xl font-bold mb-4 leading-tight">
@@ -364,7 +364,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </div>
 
           {/* Share Actions */}
-          <ArticleActions slug={article.slug} title={article.title} excerpt={article.excerpt} />
+          <ArticleActions articleId={article.id} slug={article.slug} title={article.title} excerpt={article.excerpt} initialLikeCount={article.likeCount} />
 
           <Separator className="my-8" />
 

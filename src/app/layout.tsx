@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { cache } from 'react'
 import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 import { Header } from '@/components/layout/header'
@@ -9,6 +10,28 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { AdSlot } from '@/components/ads/ad-slot'
 import { PlaceAdsCTA } from '@/components/ads/place-ads-cta'
 import { OrganizationJsonLd, WebsiteJsonLd } from '@/components/seo/article-json-ld'
+import { db } from '@/lib/db'
+
+// BUG FIX (2026-09-02): BreakingNews used to be a pure client component
+// that server-rendered stale hardcoded fallback headlines (from the
+// pre-rebrand NewsBali era, likely 404 links by now), then fetched the
+// real data client-side AFTER hydration - every single page load paid for
+// a full extra network round trip AND a visible flash from fake headlines
+// to real ones, on top of that fetch competing for this project's single
+// pooled DB connection (connection_limit=1) against whatever else that
+// page was already loading. Fetching it here, server-side, in the layout
+// every page already goes through removes both problems: no separate
+// request, no flash, and it's real-time accurate on every full page load
+// (this layout has no revalidate/cache directive, so it runs fresh per
+// request like the rest of this project's dynamic pages).
+const getBreakingNews = cache(async () => {
+  return db.article.findMany({
+    where: { status: 'PUBLISHED' },
+    orderBy: { publishedAt: 'desc' },
+    take: 5,
+    select: { id: true, title: true, slug: true, category: true },
+  })
+})
 
 const inter = Inter({
   variable: '--font-inter',
@@ -81,11 +104,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const breakingNews = await getBreakingNews()
+
   return (
     <html lang="id" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased bg-background text-foreground font-sans`} suppressHydrationWarning>
@@ -95,7 +120,7 @@ export default function RootLayout({
           <div className="min-h-screen flex flex-col">
             <Header />
             <AdSlot position="MOBILE_BANNER" device="MOBILE" className="py-2" />
-            <BreakingNews />
+            <BreakingNews initialNews={breakingNews} />
             <main className="flex-1">
               {children}
             </main>

@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useLang } from '@/lib/use-lang'
 
 interface ShareMenuProps {
+  articleId: string
   title: string
   /** Full absolute URL to the article - passed in so this stays a pure/testable component instead of reading window.location itself. */
   url: string
@@ -62,15 +63,22 @@ function WhatsAppIcon() {
  * toast telling the reader to paste it into a Story or their bio, instead of
  * silently doing nothing or opening a dead link.
  */
-export function ShareMenu({ title, url }: ShareMenuProps) {
+export function ShareMenu({ articleId, title, url }: ShareMenuProps) {
   const { toast } = useToast()
   const lang = useLang()
   const t = translations[lang]
+
+  // Fire-and-forget - powers the admin Metrics panel's "Most Shared"
+  // indicator. Never blocks the actual share action on this succeeding.
+  function trackShare() {
+    fetch(`/api/articles/${articleId}/share`, { method: 'POST' }).catch(() => {})
+  }
 
   async function copyLink(onSuccessDesc: string) {
     try {
       await navigator.clipboard.writeText(url)
       toast({ title: t.linkCopiedTitle, description: onSuccessDesc })
+      trackShare()
     } catch {
       toast({ title: t.copyFailedTitle, variant: 'destructive' })
     }
@@ -93,13 +101,13 @@ export function ShareMenu({ title, url }: ShareMenuProps) {
           {t.copyLink}
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+          <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" onClick={trackShare}>
             <WhatsAppIcon />
             <span className="ml-2">{t.whatsapp}</span>
           </a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href={facebookUrl} target="_blank" rel="noopener noreferrer">
+          <a href={facebookUrl} target="_blank" rel="noopener noreferrer" onClick={trackShare}>
             <Facebook className="h-4 w-4 mr-2" />
             {t.facebook}
           </a>

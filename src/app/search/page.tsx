@@ -38,6 +38,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       })
     : []
 
+  // Powers the admin Metrics panel's "Most Searched" indicator - one row
+  // per real search performed. Didn't exist before 2026-09-02 (search
+  // queries weren't tracked at all). Best-effort: a logging failure should
+  // never break the actual search page.
+  if (query) {
+    await db.searchQuery.create({ data: { query, resultCount: articles.length } }).catch((err) => {
+      console.error('Failed to log search query:', err)
+    })
+  }
+
   return (
     <div className="container mx-auto max-w-7xl px-4 py-10">
       <div className="mb-8">
