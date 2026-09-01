@@ -120,6 +120,10 @@ model Article {
   viewCount           Int             @default(0)
   likeCount           Int             @default(0)
   shareCount          Int             @default(0)
+  // Set once this article's URL has been submitted to IndexNow (Bing,
+  // Yandex, etc. - see src/lib/indexnow.ts) - null means "not submitted
+  // yet", picked up by the indexnow-submit cron.
+  indexNowSubmittedAt DateTime?
   authorId            String
   author              User            @relation(fields: [authorId], references: [id])
   evidences           Evidence[]

@@ -102,6 +102,19 @@ const riskLevelColors: Record<string, string> = {
   CRITICAL: 'bg-red-500',
 }
 
+// Bing (and Google similarly) flags meta descriptions outside a 25-160
+// char range as an SEO error ("Meta Description too long or too short") -
+// confirmed live via Bing Webmaster Tools. article.excerpt is AI-generated
+// with no length cap: 65 of 128 published articles exceeded 160 chars.
+// Truncated only here, at the meta-tag boundary - the full excerpt still
+// displays as-is everywhere else on the page (article header, cards, etc.).
+function truncateForMetaDescription(text: string, max = 155): string {
+  if (text.length <= max) return text
+  const truncated = text.slice(0, max)
+  const lastSpace = truncated.lastIndexOf(' ')
+  return `${truncated.slice(0, lastSpace > 0 ? lastSpace : max)}...`
+}
+
 export async function generateMetadata({ params }: ArticlePageProps) {
   const { slug } = await params
   const article = await getArticle(slug)
@@ -109,6 +122,8 @@ export async function generateMetadata({ params }: ArticlePageProps) {
   if (!article) {
     return { title: 'Article not found' }
   }
+
+  const metaDescription = truncateForMetaDescription(article.excerpt)
 
   // Always fall back to the site's default OG image rather than an empty
   // array - an article with no featured image (should be rare after the
@@ -120,13 +135,13 @@ export async function generateMetadata({ params }: ArticlePageProps) {
 
   return {
     title: article.title,
-    description: article.excerpt,
+    description: metaDescription,
     alternates: {
       canonical: `/article/${article.slug}`,
     },
     openGraph: {
       title: article.title,
-      description: article.excerpt,
+      description: metaDescription,
       url: canonicalUrl,
       siteName: SITE_NAME,
       locale: 'en_US',
@@ -152,7 +167,7 @@ export async function generateMetadata({ params }: ArticlePageProps) {
     twitter: {
       card: 'summary_large_image',
       title: article.title,
-      description: article.excerpt,
+      description: metaDescription,
       images: [ogImageUrl],
     },
   }

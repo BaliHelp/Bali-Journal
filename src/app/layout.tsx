@@ -39,7 +39,12 @@ export const metadata: Metadata = {
     default: 'Bali Journal - Independent Investigative Journalism',
     template: '%s | Bali Journal',
   },
-  description: 'Bali News, updated daily: independent investigative journalism covering Tourism, Government, Investment, Incidents, and Local affairs across Bali, Indonesia - evidence-based reporting you can trust.',
+  // Kept under 160 chars - Bing Webmaster Tools flagged the old 198-char
+  // version as an SEO error ("Meta Description too long or too short",
+  // Bing's own stated limit is 25-160 chars; Google truncates similarly
+  // around ~155-160). Full context lives in openGraph.description /
+  // twitter.description below instead, which don't have this constraint.
+  description: 'Bali News updated daily - independent investigative journalism covering Tourism, Government, Investment, Incidents, and Local affairs across Bali, Indonesia.',
   keywords: ['Bali news', 'Bali news today', 'daily Bali news', 'Bali viral', 'news Bali', 'Investigative Journalism', 'Bali Tourism', 'Bali Investment', 'Bali Government', 'Canggu News', 'Bali Safety', 'Travel Advice Bali', 'Bali Journal'],
   // Root-level default: the homepage's own canonical. Every other route
   // (article, category, /news, /search, static pages) sets its own
