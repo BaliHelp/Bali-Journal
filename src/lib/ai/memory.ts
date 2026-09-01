@@ -86,7 +86,11 @@ export interface RecalledMemory {
 }
 
 export interface RecallMemoriesInput {
-    agentKey: AgentKey
+    // Accepts one agent or several - e.g. a writer agent (WIE/WUE) recalling
+    // AUDY's past legal-risk decisions so it can avoid a risky framing
+    // *before* writing, not just get caught by analyzeLegalRisk() after the
+    // fact. Single-agent callers (the original use case) just pass one key.
+    agentKey: AgentKey | AgentKey[]
     query: string
     category?: string
     limit?: number
@@ -104,8 +108,9 @@ export async function recallMemories({
 }: RecallMemoriesInput): Promise<RecalledMemory[]> {
     const vec = await embed(query)
     const vecLiteral = toVectorLiteral(vec)
+    const agentKeys = Array.isArray(agentKey) ? agentKey : [agentKey]
 
-    const params: unknown[] = [vecLiteral, agentKey, limit]
+    const params: unknown[] = [vecLiteral, agentKeys, limit]
     let categoryClause = ''
     if (category) {
         params.push(category)
@@ -123,7 +128,7 @@ export async function recallMemories({
         `SELECT id, content, category, metadata, "createdAt",
                 1 - (embedding <=> $1::vector) AS similarity
          FROM agent_memories
-         WHERE "agentKey" = $2
+         WHERE "agentKey" = ANY($2)
            AND embedding IS NOT NULL
            ${categoryClause}
          ORDER BY embedding <=> $1::vector
@@ -132,6 +137,30 @@ export async function recallMemories({
     )
 
     return rows.filter(r => r.similarity >= minSimilarity)
+}
+
+/**
+ * Convenience for the writing entry points (rewrite-external-news.ts,
+ * process-raw-data route) - recalls AUDY's past legal-risk precedents
+ * relevant to the topic being written about, so the writer can avoid a
+ * risky framing before it's even written, rather than relying solely on
+ * analyzeLegalRisk() catching it afterward. Never throws - memory is a
+ * nice-to-have, not a hard dependency for content generation.
+ */
+export async function getLegalPrecedentContext(topic: string): Promise<string> {
+    try {
+        const memories = await recallMemories({
+            agentKey: 'AUDY',
+            category: 'legal-risk-decision',
+            query: topic,
+            limit: 3,
+            minSimilarity: 0.4,
+        })
+        return formatMemoriesForPrompt(memories)
+    } catch (err) {
+        console.error('getLegalPrecedentContext failed:', err)
+        return ''
+    }
 }
 
 // Formats recalled memories as a system-prompt-ready block, or an empty

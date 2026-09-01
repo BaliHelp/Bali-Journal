@@ -296,6 +296,15 @@ interface MetricsData {
   totals: { views: number; likes: number; shares: number; searches: number }
 }
 
+interface AgentMemoryItem {
+  id: string
+  agentKey: string
+  category: string | null
+  content: string
+  metadata: Record<string, unknown> | null
+  createdAt: string
+}
+
 interface Report {
   id: string
   title: string
@@ -397,6 +406,12 @@ export default function MasterAdminDashboard() {
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [trashList, setTrashList] = useState<Article[] | null>(null)
   const [trashLoading, setTrashLoading] = useState(false)
+  const [agentMemories, setAgentMemories] = useState<AgentMemoryItem[] | null>(null)
+  const [agentMemoriesTotal, setAgentMemoriesTotal] = useState(0)
+  const [agentMemoriesByAgent, setAgentMemoriesByAgent] = useState<{ agentKey: string; count: number }[]>([])
+  const [memoriesLoading, setMemoriesLoading] = useState(false)
+  const [memoryAgentFilter, setMemoryAgentFilter] = useState<string>('all')
+  const [memorySearch, setMemorySearch] = useState('')
   // Articles tab sub-view: 'all' is the month-paginated table, 'risk' is a
   // flat list of every HIGH/CRITICAL article regardless of which month it's
   // in - reuses the same on-demand fetch the Overview "High Risk Articles"
@@ -824,6 +839,13 @@ export default function MasterAdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
+  useEffect(() => {
+    if (activeTab === 'ai' && agentMemories === null && !memoriesLoading) {
+      fetchAgentMemories()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
 
   async function handleApproveAdvertiser(id: string) {
     try {
@@ -1180,6 +1202,36 @@ export default function MasterAdminDashboard() {
       setSuccess('Artikel dihapus permanen.')
     } catch {
       setError('Gagal menghapus artikel permanen')
+    }
+  }
+
+  async function fetchAgentMemories() {
+    setMemoriesLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (memoryAgentFilter !== 'all') params.set('agentKey', memoryAgentFilter)
+      if (memorySearch.trim()) params.set('q', memorySearch.trim())
+      const res = await fetch(`/api/admin/ai/memory?${params.toString()}`)
+      const data = await res.json()
+      setAgentMemories(Array.isArray(data.memories) ? data.memories : [])
+      setAgentMemoriesTotal(data.total || 0)
+      setAgentMemoriesByAgent(data.byAgent || [])
+    } catch (err) {
+      console.error('Failed to load agent memories:', err)
+    } finally {
+      setMemoriesLoading(false)
+    }
+  }
+
+  async function handleDeleteMemory(id: string) {
+    if (!confirm('Hapus memory ini? AI tidak akan lagi mengingat keputusan ini.')) return
+    try {
+      const res = await fetch(`/api/admin/ai/memory/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete')
+      setAgentMemories((prev) => (prev || []).filter((m) => m.id !== id))
+      setAgentMemoriesTotal((t) => Math.max(0, t - 1))
+    } catch {
+      setError('Gagal menghapus memory')
     }
   }
 
@@ -3846,6 +3898,79 @@ export default function MasterAdminDashboard() {
                   onError={(msg) => setError(msg)}
                   onRefresh={fetchAllData}
                 />
+              </CardContent>
+            </Card>
+
+            {/* Agent Memory - previously 100% invisible: the data existed
+                and was actively being written to (see src/lib/ai/memory.ts,
+                used by analyzeLegalRisk) but nothing anywhere let anyone
+                see or manage it. */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  Agent Memory
+                </CardTitle>
+                <CardDescription>
+                  Memori semantik yang diingat AI dari keputusan-keputusan masa lalu (pgvector) - dipakai supaya penilaian risiko hukum & penulisan artikel konsisten dengan preseden sebelumnya. Total: {agentMemoriesTotal} memori.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  {agentMemoriesByAgent.map((a) => (
+                    <Badge key={a.agentKey} variant="secondary">{a.agentKey}: {a.count}</Badge>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <Select value={memoryAgentFilter} onValueChange={(v) => { setMemoryAgentFilter(v); }}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Semua Agent" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Agent</SelectItem>
+                      <SelectItem value="WIE">WIE</SelectItem>
+                      <SelectItem value="WUE">WUE</SelectItem>
+                      <SelectItem value="AUDY">AUDY</SelectItem>
+                      <SelectItem value="AS">AS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Cari isi memory..."
+                    value={memorySearch}
+                    onChange={(e) => setMemorySearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && fetchAgentMemories()}
+                    className="max-w-xs"
+                  />
+                  <AsyncButton variant="outline" onClick={fetchAgentMemories}>
+                    <Search className="h-4 w-4 mr-2" /> Cari
+                  </AsyncButton>
+                </div>
+
+                {memoriesLoading && agentMemories === null ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" /> Memuat...
+                  </div>
+                ) : !agentMemories || agentMemories.length === 0 ? (
+                  <p className="text-center py-12 text-muted-foreground">Belum ada memory.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                    {agentMemories.map((m) => (
+                      <div key={m.id} className="flex items-start justify-between gap-3 p-3 border rounded bg-background/60">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline">{m.agentKey}</Badge>
+                            {m.category && <Badge variant="secondary" className="text-xs">{m.category}</Badge>}
+                            <span className="text-xs text-muted-foreground">{new Date(m.createdAt).toLocaleString('id-ID')}</span>
+                          </div>
+                          <p className="text-sm">{m.content}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="shrink-0 text-red-500 hover:text-red-700" onClick={() => handleDeleteMemory(m.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

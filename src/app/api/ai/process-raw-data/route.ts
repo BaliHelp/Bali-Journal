@@ -26,6 +26,13 @@ export async function POST(request: Request) {
         // cross-contamination from another app sharing that field on the
         // gateway. 'chatbot' (GPT-4o-mini) follows the requested schema
         // reliably instead.
+        // Recall AUDY's past legal-risk precedents relevant to this content
+        // BEFORE writing (agent memory, see src/lib/ai/memory.ts) - lets a
+        // risky framing get avoided up front instead of only being caught
+        // by analyzeLegalRisk() afterward.
+        const { getLegalPrecedentContext } = await import('@/lib/ai/memory')
+        const legalPrecedents = await getLegalPrecedentContext(content.slice(0, 500))
+
         const result = await myaiCompleteJSON('chatbot', [
             {
                 role: "system",
@@ -34,7 +41,7 @@ export async function POST(request: Request) {
 
                 ${pickWritingStyle().rules}
 
-                ${TITLE_DIVERSITY_RULES}
+                ${TITLE_DIVERSITY_RULES}${legalPrecedents}
 
                 CRITICAL: Regardless of what language the raw data below is written in (it may be
                 Indonesian), you MUST write the article in English and respond with EXACTLY these

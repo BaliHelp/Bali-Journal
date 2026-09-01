@@ -62,8 +62,14 @@ export async function rewriteExternalNewsToArticle(input: RewriteExternalNewsInp
     }
     onProgress?.('Mengambil garis besar berita...')
 
-    // 2. AI rewrites it
+    // 2. AI rewrites it - recall AUDY's past legal-risk precedents relevant
+    // to this specific story BEFORE writing (agent memory, see
+    // src/lib/ai/memory.ts), so a risky framing can be avoided up front
+    // instead of only being caught by analyzeLegalRisk() afterward.
     onProgress?.('Membuat berita baru...')
+    const { getLegalPrecedentContext } = await import('@/lib/ai/memory')
+    const legalPrecedents = await getLegalPrecedentContext(content.slice(0, 500))
+
     const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>('chatbot', [
         {
             role: 'system', content: `${AGENT_PERSONAS.WIE.instructions}
@@ -74,7 +80,7 @@ TASK: Read the provided HTML/text from a source URL. Extract the main news story
 
 ${pickWritingStyle().rules}
 
-${TITLE_DIVERSITY_RULES}
+${TITLE_DIVERSITY_RULES}${legalPrecedents}
 
 CRITICAL: Regardless of what language the source material is written in, you MUST write the
 article in English and respond with EXACTLY these JSON field names in English - never
