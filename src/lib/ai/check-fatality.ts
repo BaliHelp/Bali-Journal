@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { analyzeLegalRisk, repairCriticalRisk } from '@/lib/ai/legal-risk'
 import { checkPublishRequirements } from '@/lib/legal/publish-lock'
+import { scheduleDelayedCall } from '@/lib/qstash'
 
 export interface CheckFatalityResult {
   before: { riskLevel: string; riskScore: number }
@@ -14,18 +15,27 @@ export interface CheckFatalityResult {
 
 /**
  * "Check Fatality" - the shared logic behind the Articles panel's manual
- * popup action AND the auto-publish-high-risk cron job. Re-analyzes an
- * article's current legal risk; if CRITICAL, runs the repair loop (up to 3
- * attempts). Always stamps legalReviewedBy/legalReviewedAt on completion -
- * running this check IS the human-in-the-loop legal review
+ * popup action AND the one-time delayed auto-recheck (see
+ * src/app/api/articles/[id]/auto-check-fatality). Re-analyzes an article's
+ * current legal risk; if CRITICAL, runs the repair loop (up to 3 attempts).
+ * Always stamps legalReviewedBy/legalReviewedAt on completion - running
+ * this check IS the human-in-the-loop legal review
  * checkPublishRequirements() requires for HIGH-risk articles. If every
  * other publish requirement is already met (image, evidence, content
- * length), auto-publishes right after - this is what lets a HIGH-risk
- * article go live without a separate manual Publish click, whether this
- * ran because an admin clicked "Check & Perbaiki Risiko" or because the
- * cron job picked it up automatically.
+ * length), auto-publishes right after.
+ *
+ * If the result lands on HIGH and still can't publish (missing evidence,
+ * etc.), this schedules exactly ONE delayed re-check for THIS article via
+ * QStash (10 minutes later) - not a recurring scan of every article, just
+ * one more attempt at this specific one, giving a human a window to add
+ * what's missing first. `isAutoRecheck` prevents that delayed call from
+ * scheduling yet another one after itself.
  */
-export async function checkFatality(articleId: string, reviewerName: string): Promise<CheckFatalityResult | null> {
+export async function checkFatality(
+  articleId: string,
+  reviewerName: string,
+  options?: { isAutoRecheck?: boolean }
+): Promise<CheckFatalityResult | null> {
   const article = await db.article.findUnique({ where: { id: articleId } })
   if (!article) return null
 
@@ -76,6 +86,17 @@ export async function checkFatality(articleId: string, reviewerName: string): Pr
       data: { status: 'PUBLISHED', publishedAt: new Date() },
     })
     published = true
+  }
+
+  if (!published && finalAnalysis.riskLevel === 'HIGH' && !options?.isAutoRecheck) {
+    try {
+      await scheduleDelayedCall(`/api/articles/${articleId}/auto-check-fatality`, 10 * 60)
+    } catch (error) {
+      // Never let a scheduling failure break the check itself - the admin
+      // still sees the up-to-date risk score/status either way, they'd
+      // just need to click "Check & Perbaiki Risiko" again manually.
+      console.error(`Failed to schedule delayed re-check for article ${articleId}:`, error)
+    }
   }
 
   return {
