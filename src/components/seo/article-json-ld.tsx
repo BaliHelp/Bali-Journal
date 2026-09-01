@@ -48,7 +48,11 @@ export function ArticleJsonLd({ article }: ArticleJsonLdProps) {
     '@type': 'NewsArticle',
     headline: article.title,
     description: article.excerpt,
-    image: article.featuredImageUrl ? [toAbsoluteUrl(article.featuredImageUrl)] : [],
+    // `image` is a REQUIRED field for Google News/Top Stories eligibility -
+    // fall back to the site default OG image rather than an empty array so
+    // an article with no featured image doesn't silently lose rich-result
+    // eligibility entirely.
+    image: [toAbsoluteUrl(article.featuredImageUrl || '/og-image.jpg')],
     datePublished: article.publishedAt?.toISOString(),
     dateModified: (article.updatedAt ?? article.publishedAt)?.toISOString(),
     author: {

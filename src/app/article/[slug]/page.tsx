@@ -17,11 +17,12 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { ArticleJsonLd, BreadcrumbJsonLd } from '@/components/seo/article-json-ld'
-import { SITE_URL } from '@/lib/site-config'
+import { SITE_URL, SITE_NAME } from '@/lib/site-config'
 import { CommentSection } from '@/components/article/comment-section'
 import { EvidenceList } from '@/components/article/evidence-list'
 import { ArticleCard } from '@/components/article/article-card'
 import { ArticleActions } from '@/components/article/article-actions'
+import { ShareMenu } from '@/components/article/share-menu'
 import { AdSlot, AdMedia, getActiveAd } from '@/components/ads/ad-slot'
 import { LangText } from '@/components/i18n/lang-text'
 import { CategoryLabel } from '@/components/i18n/category-label'
@@ -109,6 +110,14 @@ export async function generateMetadata({ params }: ArticlePageProps) {
     return { title: 'Article not found' }
   }
 
+  // Always fall back to the site's default OG image rather than an empty
+  // array - an article with no featured image (should be rare after the
+  // storage fix, but e.g. mid-generation failures) would otherwise share
+  // with NO image preview at all on WhatsApp/Facebook/etc, which is worse
+  // than showing the generic Bali Journal card.
+  const ogImageUrl = article.featuredImageUrl || `${SITE_URL}/og-image.jpg`
+  const canonicalUrl = `${SITE_URL}/article/${article.slug}`
+
   return {
     title: article.title,
     description: article.excerpt,
@@ -118,16 +127,33 @@ export async function generateMetadata({ params }: ArticlePageProps) {
     openGraph: {
       title: article.title,
       description: article.excerpt,
+      url: canonicalUrl,
+      siteName: SITE_NAME,
+      locale: 'en_US',
       type: 'article',
       publishedTime: article.publishedAt?.toISOString(),
+      modifiedTime: article.updatedAt?.toISOString(),
+      section: article.category.charAt(0) + article.category.slice(1).toLowerCase(),
       authors: [article.author?.name || 'Bali Journal Team'],
-      images: article.featuredImageUrl ? [{ url: article.featuredImageUrl }] : [],
+      images: [
+        {
+          url: ogImageUrl,
+          // Matches the site's standard featured-image size (see the
+          // "Rekomendasi ukuran" hint in admin's upload/crop flow) - giving
+          // WhatsApp/Facebook/LinkedIn explicit dimensions lets them render
+          // the large card immediately instead of having to fetch+measure
+          // the image themselves first.
+          width: 1200,
+          height: 675,
+          alt: article.featuredImageAlt || article.title,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
       title: article.title,
       description: article.excerpt,
-      images: article.featuredImageUrl ? [article.featuredImageUrl] : [],
+      images: [ogImageUrl],
     },
   }
 }
@@ -206,17 +232,20 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
           {/* Header */}
           <header className="mb-8">
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              <Badge variant="secondary">
-                <CategoryLabel category={article.category} />
-              </Badge>
-              <Badge
-                variant="outline"
-                className="flex items-center gap-1"
-              >
-                <Shield className="h-3 w-3" />
-                <LangText en="Verified" id="Terverifikasi" />
-              </Badge>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">
+                  <CategoryLabel category={article.category} />
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1"
+                >
+                  <Shield className="h-3 w-3" />
+                  <LangText en="Verified" id="Terverifikasi" />
+                </Badge>
+              </div>
+              <ShareMenu title={article.title} url={`${SITE_URL}/article/${article.slug}`} />
             </div>
 
             <h1 className="text-3xl md:text-4xl font-bold mb-4 leading-tight">
