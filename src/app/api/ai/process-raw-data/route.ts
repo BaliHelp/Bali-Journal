@@ -73,10 +73,22 @@ export async function POST(request: Request) {
         }
 
         // 2. Generate Image (verified binary, stored locally — stable URL forever)
+        // Pass `content` so the image prompt is grounded in what this specific
+        // article is actually about (AI-reasoned prompt), not just the
+        // generic category+excerpt template.
         const storedImage = await generateAndStoreImage(result.title, undefined, {
             category: result.category,
             excerpt: result.excerpt,
+            content: result.content,
         })
+
+        // riskLevel was previously hardcoded to 'LOW' regardless of what the
+        // model actually assessed (result.riskLevel was requested in the
+        // schema but silently discarded) - every raw-data-generated article
+        // went unscreened. Use the model's own self-assessment instead,
+        // same validated-enum pattern as rewrite-external-news.ts.
+        const riskLevel = (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(result.riskLevel) ? result.riskLevel : 'LOW') as
+            'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 
         // 3. Create Article
         const article = await db.article.create({
@@ -90,7 +102,7 @@ export async function POST(request: Request) {
                 featuredImageAlt: result.title,
                 imageSource: storedImage.source,
                 aiAssisted: true,
-                riskLevel: 'LOW', // Default, assuming editor checks
+                riskLevel,
                 status: autoPublish ? 'PUBLISHED' : 'DRAFT',
                 authorId: session.id,
                 publishedAt: autoPublish ? new Date() : null
