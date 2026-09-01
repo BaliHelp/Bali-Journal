@@ -4,10 +4,11 @@ import { ArticleCard } from '@/components/article/article-card'
 import { CategorySection } from '@/components/article/category-section'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Clock, TrendingUp, AlertTriangle, Shield, FileText } from 'lucide-react'
+import { Clock, FileText } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { AdSlot, AdMedia, getActiveAd } from '@/components/ads/ad-slot'
+import { PopularNewsCarousel } from '@/components/home/popular-news-carousel'
 
 export const revalidate = 60 // ISR: 60 seconds
 
@@ -60,9 +61,20 @@ const getArticlesByCategory = cache(async (category: string) => {
   })
 })
 
-const getPublishedCount = cache(async () => {
-  return db.article.count({
-    where: { status: 'PUBLISHED' }
+// Replaces the old static "Trust Indicators" cards (100% Evidence-Based /
+// Published Articles / Legal Review / Editorial Process) with a swipeable
+// "Most Popular News" row - see PopularNewsCarousel. 10 items gives the
+// auto-scroll loop enough content to feel like a real crawl rather than
+// looping back after just 3-4 cards.
+const getPopularArticlesForHome = cache(async () => {
+  return db.article.findMany({
+    where: { status: 'PUBLISHED' },
+    orderBy: { viewCount: 'desc' },
+    take: 10,
+    select: {
+      id: true, title: true, slug: true, category: true,
+      featuredImageUrl: true, featuredImageAlt: true, viewCount: true,
+    },
   })
 })
 
@@ -76,8 +88,8 @@ export default async function HomePage() {
     localArticles,
     jobsArticles,
     opinionArticles,
-    totalPublished,
     heroLeftAd,
+    popularArticles,
   ] = await Promise.all([
     getLatestArticles(),
     getFeaturedArticle(),
@@ -87,8 +99,8 @@ export default async function HomePage() {
     getArticlesByCategory('LOCAL'),
     getArticlesByCategory('JOBS'),
     getArticlesByCategory('OPINION'),
-    getPublishedCount(),
     getActiveAd('HOME_HERO_LEFT', 'DESKTOP'),
+    getPopularArticlesForHome(),
   ])
 
   return (
@@ -268,39 +280,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Trust Indicators */}
+      {/* Most Popular News - replaces the old static "Trust Indicators"
+          cards (100% Evidence-Based / Published Articles / Legal Review /
+          Editorial Process) per explicit request: real engagement content,
+          swipeable + auto-scrolling slowly, instead of static claims. */}
       <section className="border-y bg-muted/30">
         <div className="container mx-auto max-w-7xl px-4 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50">
-              <Shield className="h-8 w-8 text-primary" />
-              <div>
-                <p className="text-2xl font-bold">100%</p>
-                <p className="text-sm text-muted-foreground">Evidence-Based</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50">
-              <FileText className="h-8 w-8 text-primary" />
-              <div>
-                <p className="text-2xl font-bold">{totalPublished}</p>
-                <p className="text-sm text-muted-foreground">Published Articles</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50">
-              <AlertTriangle className="h-8 w-8 text-primary" />
-              <div>
-                <p className="text-2xl font-bold">Legal</p>
-                <p className="text-sm text-muted-foreground">Legal Review</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50">
-              <TrendingUp className="h-8 w-8 text-primary" />
-              <div>
-                <p className="text-2xl font-bold">Transparent</p>
-                <p className="text-sm text-muted-foreground">Editorial Process</p>
-              </div>
-            </div>
-          </div>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+            Most Popular News
+          </h2>
+          <PopularNewsCarousel articles={popularArticles} />
         </div>
       </section>
 

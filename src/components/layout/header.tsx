@@ -207,7 +207,7 @@ export function Header() {
                   <SheetContent side="right" className="w-80">
                     <SheetTitle className="sr-only">{t.categories}</SheetTitle>
                     <nav className="flex flex-col space-y-4 mt-8">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-center">
                         <span className="text-sm font-semibold text-muted-foreground">
                           {t.categories}
                         </span>
@@ -216,7 +216,7 @@ export function Header() {
                         <Link
                           key={category.href}
                           href={category.href}
-                          className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors"
+                          className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors text-right"
                         >
                           {category.label}
                         </Link>
@@ -224,19 +224,19 @@ export function Header() {
                       <hr className="my-2" />
                       <Link
                         href="/submit-report"
-                        className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors"
+                        className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors text-right"
                       >
                         {t.submitReport}
                       </Link>
                       <Link
                         href="/transparency"
-                        className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors"
+                        className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors text-right"
                       >
                         {t.transparency}
                       </Link>
                       <Link
                         href="/about"
-                        className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors"
+                        className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md transition-colors text-right"
                       >
                         {t.about}
                       </Link>

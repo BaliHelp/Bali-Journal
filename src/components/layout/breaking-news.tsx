@@ -84,7 +84,8 @@ export function BreakingNews({ initialNews }: BreakingNewsProps) {
         }
 
         .animate-marquee {
-          animation: marquee 30s linear infinite;
+          /* Sped up 1 fold (2x) per request - was 30s */
+          animation: marquee 15s linear infinite;
         }
 
         .animate-marquee:hover {
