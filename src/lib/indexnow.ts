@@ -3,10 +3,17 @@ import { SITE_URL, SITE_DOMAIN } from '@/lib/site-config'
 // IndexNow protocol (https://www.indexnow.org) - one shared endpoint that
 // fans out to every participating search engine (Bing, Yandex, and others),
 // so publishing an article doesn't have to wait for their crawlers to
-// discover it on their own schedule. Key must match the .txt file hosted
-// at the site root (public/<key>.txt) - see Bing Webmaster Tools' own
-// IndexNow setup instructions, which is where this key came from.
-const INDEXNOW_KEY = '9fdc400c5f92422a82d1c73987c5b221'
+// discover it on their own schedule.
+//
+// Key comes from INDEXNOW_KEY (env var, not hardcoded - this project gets
+// copied wholesale to sibling projects with different domains, e.g.
+// Jurnal Kotabunan, and a hardcoded key would silently submit URLs under
+// the WRONG site's identity). The key must also match a .txt file hosted
+// at the site root: public/<key>.txt containing just the key itself (get
+// both from Bing Webmaster Tools -> your site -> IndexNow). Missing the
+// env var just skips submission (logged once) rather than breaking
+// anything - same fail-open pattern as this project's other optional
+// integrations.
 const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow'
 
 /**
@@ -17,14 +24,20 @@ const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow'
 export async function submitToIndexNow(urls: string[]): Promise<boolean> {
     if (urls.length === 0) return true
 
+    const key = process.env.INDEXNOW_KEY
+    if (!key) {
+        console.warn('INDEXNOW_KEY not set - skipping IndexNow submission. See .env.example.')
+        return false
+    }
+
     try {
         const res = await fetch(INDEXNOW_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json; charset=utf-8' },
             body: JSON.stringify({
                 host: SITE_DOMAIN,
-                key: INDEXNOW_KEY,
-                keyLocation: `${SITE_URL}/${INDEXNOW_KEY}.txt`,
+                key,
+                keyLocation: `${SITE_URL}/${key}.txt`,
                 urlList: urls,
             }),
         })
