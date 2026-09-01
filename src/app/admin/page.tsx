@@ -88,7 +88,9 @@ import {
   TrendingUp,
   RotateCcw,
   Heart,
-  Share2
+  Share2,
+  Mail,
+  Archive
 } from 'lucide-react'
 import Image from 'next/image'
 import { AiControls } from '@/components/admin/ai-controls'
@@ -119,6 +121,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { value: 'articles', label: 'Articles', icon: FileText },
       { value: 'trash', label: 'Trash', icon: Trash2 },
       { value: 'comments', label: 'Comments', icon: MessageCircle },
+      { value: 'email', label: 'Email', icon: Mail },
     ],
   },
   {
@@ -305,6 +308,19 @@ interface AgentMemoryItem {
   createdAt: string
 }
 
+interface ContactSubmissionItem {
+  id: string
+  name: string
+  email: string
+  subject: string
+  message: string
+  status: 'UNREAD' | 'READ' | 'ARCHIVED' | 'REPLIED'
+  replyMessage: string | null
+  repliedBy: string | null
+  repliedAt: string | null
+  createdAt: string
+}
+
 interface Report {
   id: string
   title: string
@@ -412,6 +428,11 @@ export default function MasterAdminDashboard() {
   const [memoriesLoading, setMemoriesLoading] = useState(false)
   const [memoryAgentFilter, setMemoryAgentFilter] = useState<string>('all')
   const [memorySearch, setMemorySearch] = useState('')
+  const [contactSubmissions, setContactSubmissions] = useState<ContactSubmissionItem[] | null>(null)
+  const [contactLoading, setContactLoading] = useState(false)
+  const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmissionItem | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [sendingReply, setSendingReply] = useState(false)
   // Articles tab sub-view: 'all' is the month-paginated table, 'risk' is a
   // flat list of every HIGH/CRITICAL article regardless of which month it's
   // in - reuses the same on-demand fetch the Overview "High Risk Articles"
@@ -840,6 +861,13 @@ export default function MasterAdminDashboard() {
   }, [activeTab])
 
   useEffect(() => {
+    if (activeTab === 'email' && contactSubmissions === null && !contactLoading) {
+      fetchContactSubmissions()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  useEffect(() => {
     if (activeTab === 'ai' && agentMemories === null && !memoriesLoading) {
       fetchAgentMemories()
     }
@@ -1232,6 +1260,71 @@ export default function MasterAdminDashboard() {
       setAgentMemoriesTotal((t) => Math.max(0, t - 1))
     } catch {
       setError('Gagal menghapus memory')
+    }
+  }
+
+  async function fetchContactSubmissions() {
+    setContactLoading(true)
+    try {
+      const res = await fetch('/api/admin/contact-submissions')
+      const data = await res.json()
+      setContactSubmissions(Array.isArray(data.submissions) ? data.submissions : [])
+    } catch (err) {
+      console.error('Failed to load contact submissions:', err)
+    } finally {
+      setContactLoading(false)
+    }
+  }
+
+  function openSubmission(sub: ContactSubmissionItem) {
+    setSelectedSubmission(sub)
+    setReplyText('')
+    if (sub.status === 'UNREAD') {
+      fetch(`/api/admin/contact-submissions/${sub.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'READ' }),
+      }).then(() => {
+        setContactSubmissions((prev) => (prev || []).map((s) => (s.id === sub.id ? { ...s, status: 'READ' } : s)))
+      })
+    }
+  }
+
+  async function handleSendReply() {
+    if (!selectedSubmission || !replyText.trim()) return
+    setSendingReply(true)
+    try {
+      const res = await fetch(`/api/admin/contact-submissions/${selectedSubmission.id}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: replyText }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send reply')
+      setContactSubmissions((prev) => (prev || []).map((s) => (s.id === selectedSubmission.id ? data.submission : s)))
+      setSelectedSubmission(data.submission)
+      setReplyText('')
+      setSuccess('Balasan terkirim!')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengirim balasan')
+    } finally {
+      setSendingReply(false)
+    }
+  }
+
+  async function handleArchiveSubmission(id: string) {
+    try {
+      const res = await fetch(`/api/admin/contact-submissions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ARCHIVED' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error('Failed to archive')
+      setContactSubmissions((prev) => (prev || []).map((s) => (s.id === id ? data.submission : s)))
+      if (selectedSubmission?.id === id) setSelectedSubmission(data.submission)
+    } catch {
+      setError('Gagal mengarsipkan pesan')
     }
   }
 
@@ -2667,6 +2760,104 @@ export default function MasterAdminDashboard() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="email">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" /> Email
+                </CardTitle>
+                <CardDescription>
+                  Pesan dari Form Contact situs. Balasan dikirim via Resend dari {' '}
+                  <span className="font-mono">contact@balijournal.com</span> - tidak perlu app password Gmail.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
+                  {/* List */}
+                  <div className="border rounded-lg divide-y max-h-[600px] overflow-y-auto">
+                    {contactLoading && contactSubmissions === null ? (
+                      <div className="flex items-center justify-center py-12 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" /> Memuat...
+                      </div>
+                    ) : !contactSubmissions || contactSubmissions.length === 0 ? (
+                      <p className="text-center py-12 text-muted-foreground text-sm">Belum ada pesan masuk.</p>
+                    ) : (
+                      contactSubmissions.map((sub) => (
+                        <button
+                          key={sub.id}
+                          onClick={() => openSubmission(sub)}
+                          className={`w-full text-left p-3 hover:bg-muted transition-colors ${selectedSubmission?.id === sub.id ? 'bg-muted' : ''}`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className={`text-sm truncate ${sub.status === 'UNREAD' ? 'font-semibold' : 'font-medium'}`}>{sub.name}</p>
+                            {sub.status === 'UNREAD' && <Badge className="bg-blue-500 shrink-0">Baru</Badge>}
+                            {sub.status === 'REPLIED' && <Badge variant="secondary" className="shrink-0">Dibalas</Badge>}
+                            {sub.status === 'ARCHIVED' && <Badge variant="outline" className="shrink-0">Arsip</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{sub.subject}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{new Date(sub.createdAt).toLocaleString('id-ID')}</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Detail + Reply */}
+                  <div>
+                    {!selectedSubmission ? (
+                      <div className="flex items-center justify-center h-full py-24 text-muted-foreground text-sm">
+                        Pilih pesan di sebelah kiri untuk membaca & membalas.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{selectedSubmission.subject}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Dari: {selectedSubmission.name} &lt;{selectedSubmission.email}&gt;
+                          </p>
+                          <p className="text-xs text-muted-foreground">{new Date(selectedSubmission.createdAt).toLocaleString('id-ID')}</p>
+                        </div>
+                        <div className="p-4 bg-muted/30 rounded-lg text-sm whitespace-pre-wrap">
+                          {selectedSubmission.message}
+                        </div>
+
+                        {selectedSubmission.status === 'REPLIED' && selectedSubmission.replyMessage && (
+                          <div className="p-4 border rounded-lg bg-green-500/10">
+                            <p className="text-xs font-medium mb-1 text-muted-foreground">
+                              Dibalas oleh {selectedSubmission.repliedBy}
+                              {selectedSubmission.repliedAt && ` • ${new Date(selectedSubmission.repliedAt).toLocaleString('id-ID')}`}
+                            </p>
+                            <p className="text-sm whitespace-pre-wrap">{selectedSubmission.replyMessage}</p>
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <Label>Balas ke {selectedSubmission.email}</Label>
+                          <Textarea
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            rows={6}
+                            placeholder="Tulis balasan..."
+                          />
+                          <div className="flex gap-2">
+                            <Button onClick={handleSendReply} disabled={sendingReply || !replyText.trim()}>
+                              {sendingReply ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                              Kirim Balasan
+                            </Button>
+                            {selectedSubmission.status !== 'ARCHIVED' && (
+                              <Button variant="outline" onClick={() => handleArchiveSubmission(selectedSubmission.id)}>
+                                <Archive className="h-4 w-4 mr-2" /> Arsipkan
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

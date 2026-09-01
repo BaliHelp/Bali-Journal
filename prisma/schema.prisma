@@ -467,14 +467,22 @@ model CompanySettings {
 
 // Contact Form Submissions
 model ContactSubmission {
-  id        String   @id @default(cuid())
-  name      String
-  email     String
-  subject   String
-  message   String
-  status    String   @default("UNREAD") // UNREAD, READ, ARCHIVED
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(cuid())
+  name        String
+  email       String
+  subject     String
+  message     String
+  status      String    @default("UNREAD") // UNREAD, READ, ARCHIVED, REPLIED
+  // Set once an admin sends a reply from the Admin Dashboard Email panel
+  // (src/app/api/admin/contact-submissions/[id]/reply) - sent via Resend,
+  // not stored as a full thread (this site has no reply-to-a-reply flow;
+  // further back-and-forth happens over normal email once the reply lands
+  // in the visitor's inbox).
+  replyMessage String?
+  repliedBy    String?
+  repliedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@map("contact_submissions")
 }
