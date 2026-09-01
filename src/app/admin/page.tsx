@@ -84,7 +84,11 @@ import {
   Receipt,
   DollarSign,
   Copy,
-  CopyCheck
+  CopyCheck,
+  TrendingUp,
+  RotateCcw,
+  Heart,
+  Share2
 } from 'lucide-react'
 import Image from 'next/image'
 import { AiControls } from '@/components/admin/ai-controls'
@@ -103,13 +107,17 @@ interface NavItem {
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Utama',
-    items: [{ value: 'overview', label: 'Overview', icon: LayoutDashboard }],
+    items: [
+      { value: 'overview', label: 'Overview', icon: LayoutDashboard },
+      { value: 'metrics', label: 'Metrics', icon: TrendingUp },
+    ],
   },
   {
     label: 'Konten',
     items: [
       { value: 'listnews', label: 'List News', icon: List },
       { value: 'articles', label: 'Articles', icon: FileText },
+      { value: 'trash', label: 'Trash', icon: Trash2 },
       { value: 'comments', label: 'Comments', icon: MessageCircle },
     ],
   },
@@ -257,11 +265,35 @@ interface Article {
   containsAccusation: boolean
   verificationLevel: string
   evidenceCount: number
-  status: 'DRAFT' | 'REVIEW' | 'PUBLISHED' | 'REJECTED'
+  status: 'DRAFT' | 'REVIEW' | 'PUBLISHED' | 'REJECTED' | 'SCHEDULED' | 'TRASHED'
   viewCount: number
+  likeCount?: number
+  shareCount?: number
+  deletedAt?: string | null
   createdAt: string
   publishedAt: string | null
   author: { name: string | null, email: string }
+}
+
+interface MetricsArticle {
+  id: string
+  title: string
+  slug: string
+  category: string
+  viewCount: number
+  likeCount: number
+  shareCount: number
+  publishedAt: string | null
+  _count: { comments: number }
+}
+
+interface MetricsData {
+  topViewed: MetricsArticle[]
+  topLiked: MetricsArticle[]
+  topShared: MetricsArticle[]
+  topCommented: MetricsArticle[]
+  topSearched: { query: string; count: number }[]
+  totals: { views: number; likes: number; shares: number; searches: number }
 }
 
 interface Report {
@@ -361,6 +393,10 @@ export default function MasterAdminDashboard() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [highRiskList, setHighRiskList] = useState<Article[] | null>(null)
   const [highRiskLoading, setHighRiskLoading] = useState(false)
+  const [metrics, setMetrics] = useState<MetricsData | null>(null)
+  const [metricsLoading, setMetricsLoading] = useState(false)
+  const [trashList, setTrashList] = useState<Article[] | null>(null)
+  const [trashLoading, setTrashLoading] = useState(false)
   // Articles tab sub-view: 'all' is the month-paginated table, 'risk' is a
   // flat list of every HIGH/CRITICAL article regardless of which month it's
   // in - reuses the same on-demand fetch the Overview "High Risk Articles"
@@ -770,6 +806,24 @@ export default function MasterAdminDashboard() {
     }
   }, [activeTab, listNewsLoaded])
 
+  // Metrics + Trash tabs: same lazy-on-open pattern. Overview also triggers
+  // this (once) since it shows the "Most Viewed Article" card sourced from
+  // the same data - avoids a second, redundant fetch if the admin then
+  // opens the full Metrics tab.
+  useEffect(() => {
+    if ((activeTab === 'metrics' || activeTab === 'overview') && !metrics && !metricsLoading) {
+      fetchMetrics()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab === 'trash' && trashList === null && !trashLoading) {
+      fetchTrash()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
 
   async function handleApproveAdvertiser(id: string) {
     try {
@@ -1079,6 +1133,56 @@ export default function MasterAdminDashboard() {
     }
   }
 
+  async function fetchMetrics() {
+    setMetricsLoading(true)
+    try {
+      const res = await fetch('/api/admin/metrics')
+      const data = await res.json()
+      setMetrics(data)
+    } catch (err) {
+      console.error('Failed to load metrics:', err)
+    } finally {
+      setMetricsLoading(false)
+    }
+  }
+
+  async function fetchTrash() {
+    setTrashLoading(true)
+    try {
+      const res = await fetch('/api/admin/articles/trash')
+      const data = await res.json()
+      setTrashList(Array.isArray(data.articles) ? data.articles : [])
+    } catch (err) {
+      console.error('Failed to load trash:', err)
+    } finally {
+      setTrashLoading(false)
+    }
+  }
+
+  async function handleRestoreArticle(id: string) {
+    try {
+      const res = await fetch(`/api/articles/${id}/restore`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to restore')
+      setTrashList((prev) => (prev || []).filter((a) => a.id !== id))
+      setSuccess('Artikel dipulihkan dari Trash!')
+      fetchAllData()
+    } catch {
+      setError('Gagal memulihkan artikel')
+    }
+  }
+
+  async function handlePermanentDelete(id: string, title: string) {
+    if (!confirm(`Hapus permanen "${title}"? Tindakan ini TIDAK BISA dibatalkan.`)) return
+    try {
+      const res = await fetch(`/api/articles/${id}/permanent`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete')
+      setTrashList((prev) => (prev || []).filter((a) => a.id !== id))
+      setSuccess('Artikel dihapus permanen.')
+    } catch {
+      setError('Gagal menghapus artikel permanen')
+    }
+  }
+
   function resetArticleForm() {
     setArticleForm({
       title: '',
@@ -1229,13 +1333,13 @@ export default function MasterAdminDashboard() {
   }
 
   async function handleDeleteArticle(id: string) {
-    if (!confirm('Are you sure you want to delete this article?')) return
+    if (!confirm('Move this article to Trash? You can restore it later, or permanently delete it from the Trash panel.')) return
 
     try {
       const res = await fetch(`/api/articles/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
-      setSuccess('Article deleted!')
-      fetchAllData()
+      removeArticleFromLists(id)
+      setSuccess('Artikel dipindahkan ke Trash.')
     } catch (err) {
       setError('Failed to delete article')
     }
@@ -1383,6 +1487,17 @@ export default function MasterAdminDashboard() {
     setMonthlyArticles(apply)
     setSearchResults((prev) => (prev ? apply(prev) : prev))
     setHighRiskList((prev) => (prev ? apply(prev) : prev))
+  }
+
+  // Used when an article moves to Trash - fetchAllData()/fetchMonthlyArticles()
+  // alone wouldn't remove it from an already-loaded month's list (that fetch
+  // is cursor-based, only ever appends NEW months, never re-fetches ones
+  // already in state).
+  function removeArticleFromLists(id: string) {
+    const remove = (list: Article[]) => list.filter((a) => a.id !== id)
+    setMonthlyArticles(remove)
+    setSearchResults((prev) => (prev ? remove(prev) : prev))
+    setHighRiskList((prev) => (prev ? remove(prev) : prev))
   }
 
   const [repairPopupArticle, setRepairPopupArticle] = useState<Article | null>(null)
@@ -1608,6 +1723,25 @@ export default function MasterAdminDashboard() {
                 <h2 className="text-xl font-semibold">Welcome back, Admin</h2>
                 <p className="text-sm text-muted-foreground">Here is what's happening on Bali Journal today.</p>
               </div>
+
+              {/* Most Viewed Article - added per request, above Quick Stats */}
+              {metrics && metrics.topViewed.length > 0 && (
+                <Card
+                  className="cursor-pointer transition-colors hover:bg-muted/50 border-primary/30"
+                  onClick={() => setActiveTab('metrics')}
+                >
+                  <CardContent className="p-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Eye className="h-4 w-4" /> Berita dengan View Terbanyak
+                      </p>
+                      <h3 className="text-lg font-bold truncate">{metrics.topViewed[0].title}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">{metrics.topViewed[0].category} • {metrics.topViewed[0].viewCount.toLocaleString()} views</p>
+                    </div>
+                    <TrendingUp className="h-10 w-10 text-primary opacity-30 shrink-0" />
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Quick Stats - click a card for a breakdown */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -2436,6 +2570,214 @@ export default function MasterAdminDashboard() {
                 </div>
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          <TabsContent value="trash">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trash2 className="h-5 w-5" /> Trash
+                </CardTitle>
+                <CardDescription>
+                  Artikel yang dihapus tersimpan di sini sebelum benar-benar dihapus permanen. Pulihkan kapan saja, atau hapus permanen.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {trashLoading && trashList === null ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" /> Memuat...
+                  </div>
+                ) : !trashList || trashList.length === 0 ? (
+                  <p className="text-center py-12 text-muted-foreground">Trash kosong.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {trashList.map((article) => (
+                      <div key={article.id} className="flex items-center justify-between p-3 border rounded bg-background/60">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{article.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {article.category} • dihapus {article.deletedAt ? new Date(article.deletedAt).toLocaleString('id-ID') : '-'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <AsyncButton variant="outline" size="sm" onClick={() => handleRestoreArticle(article.id)}>
+                            <RotateCcw className="h-4 w-4 mr-2" /> Restore
+                          </AsyncButton>
+                          <AsyncButton
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handlePermanentDelete(article.id, article.title)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" /> Hapus Permanen
+                          </AsyncButton>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="metrics">
+            <div className="grid gap-6">
+              <div>
+                <h2 className="text-xl font-semibold">Metrics</h2>
+                <p className="text-sm text-muted-foreground">Indikator performa konten di seluruh situs.</p>
+              </div>
+
+              {metricsLoading && !metrics ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" /> Memuat metrics...
+                </div>
+              ) : metrics ? (
+                <>
+                  {/* Totals */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Views</p>
+                          <h3 className="text-2xl font-bold">{metrics.totals.views.toLocaleString()}</h3>
+                        </div>
+                        <Eye className="h-8 w-8 text-blue-500 opacity-20" />
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Likes</p>
+                          <h3 className="text-2xl font-bold">{metrics.totals.likes.toLocaleString()}</h3>
+                        </div>
+                        <Heart className="h-8 w-8 text-red-500 opacity-20" />
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Shares</p>
+                          <h3 className="text-2xl font-bold">{metrics.totals.shares.toLocaleString()}</h3>
+                        </div>
+                        <Share2 className="h-8 w-8 text-green-500 opacity-20" />
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Pencarian</p>
+                          <h3 className="text-2xl font-bold">{metrics.totals.searches.toLocaleString()}</h3>
+                        </div>
+                        <Search className="h-8 w-8 text-purple-500 opacity-20" />
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Ranked lists */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><Eye className="h-4 w-4" /> 10 Artikel Paling Banyak Dibuka</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {metrics.topViewed.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada data.</p> : (
+                          <ol className="space-y-2">
+                            {metrics.topViewed.map((a, i) => (
+                              <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <span className="text-muted-foreground w-5 shrink-0">{i + 1}.</span>
+                                  <a href={`/article/${a.slug}`} target="_blank" rel="noreferrer" className="truncate hover:underline">{a.title}</a>
+                                </span>
+                                <Badge variant="secondary" className="shrink-0">{a.viewCount.toLocaleString()}</Badge>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><Heart className="h-4 w-4" /> Artikel Paling Banyak Like</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {metrics.topLiked.length === 0 || metrics.topLiked[0].likeCount === 0 ? <p className="text-sm text-muted-foreground">Belum ada like.</p> : (
+                          <ol className="space-y-2">
+                            {metrics.topLiked.filter(a => a.likeCount > 0).map((a, i) => (
+                              <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <span className="text-muted-foreground w-5 shrink-0">{i + 1}.</span>
+                                  <a href={`/article/${a.slug}`} target="_blank" rel="noreferrer" className="truncate hover:underline">{a.title}</a>
+                                </span>
+                                <Badge variant="secondary" className="shrink-0">{a.likeCount.toLocaleString()}</Badge>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><Share2 className="h-4 w-4" /> Artikel Paling Banyak Dibagikan</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {metrics.topShared.length === 0 || metrics.topShared[0].shareCount === 0 ? <p className="text-sm text-muted-foreground">Belum ada share.</p> : (
+                          <ol className="space-y-2">
+                            {metrics.topShared.filter(a => a.shareCount > 0).map((a, i) => (
+                              <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <span className="text-muted-foreground w-5 shrink-0">{i + 1}.</span>
+                                  <a href={`/article/${a.slug}`} target="_blank" rel="noreferrer" className="truncate hover:underline">{a.title}</a>
+                                </span>
+                                <Badge variant="secondary" className="shrink-0">{a.shareCount.toLocaleString()}</Badge>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><MessageCircle className="h-4 w-4" /> Artikel Paling Banyak Dikomentari</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {metrics.topCommented.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada komentar.</p> : (
+                          <ol className="space-y-2">
+                            {metrics.topCommented.map((a, i) => (
+                              <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <span className="text-muted-foreground w-5 shrink-0">{i + 1}.</span>
+                                  <a href={`/article/${a.slug}`} target="_blank" rel="noreferrer" className="truncate hover:underline">{a.title}</a>
+                                </span>
+                                <Badge variant="secondary" className="shrink-0">{a._count.comments.toLocaleString()}</Badge>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="lg:col-span-2">
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><Search className="h-4 w-4" /> Kata Kunci Paling Banyak Dicari</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {metrics.topSearched.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada pencarian tercatat.</p> : (
+                          <div className="flex flex-wrap gap-2">
+                            {metrics.topSearched.map((s) => (
+                              <Badge key={s.query} variant="outline" className="text-sm">
+                                {s.query} <span className="ml-1.5 text-muted-foreground">({s.count})</span>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              ) : null}
+            </div>
           </TabsContent>
 
           <TabsContent value="comments">

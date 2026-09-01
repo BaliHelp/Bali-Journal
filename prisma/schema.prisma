@@ -52,6 +52,14 @@ enum Status {
   PUBLISHED
   REJECTED
   SCHEDULED
+  // Soft-delete state (Trash panel) - articles moved here via DELETE
+  // /api/articles/[id] instead of being hard-deleted immediately. Every
+  // public-facing query filters on a SPECIFIC status (PUBLISHED), never
+  // "not DRAFT" or similar, so adding this value automatically excludes
+  // trashed articles from the live site with no changes needed to those
+  // ~13 query sites - only the admin's own listing endpoints needed an
+  // explicit `status: { not: TRASHED }` added.
+  TRASHED
 }
 
 // Comment Status
@@ -104,7 +112,14 @@ model Article {
   legalReviewedBy     String?
   legalReviewedAt     DateTime?
   status              Status          @default(DRAFT)
+  // Set only when status is TRASHED - what to restore `status` to. Kept
+  // separate from `status` itself so restore doesn't need to guess whether
+  // a trashed article used to be DRAFT/PUBLISHED/etc.
+  previousStatus      Status?
+  deletedAt           DateTime? // When moved to trash - null otherwise
   viewCount           Int             @default(0)
+  likeCount           Int             @default(0)
+  shareCount          Int             @default(0)
   authorId            String
   author              User            @relation(fields: [authorId], references: [id])
   evidences           Evidence[]
@@ -263,15 +278,36 @@ model TeamMember {
 
 // Editable Schedule Configuration
 model ScheduleConfig {
-  id        String   @id @default(cuid())
-  time      String // e.g. "06:00"
-  label     String // e.g. "Hot News"
-  slots     Int      @default(1)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(cuid())
+  time        String // e.g. "06:00", checked against current time by the
+  // schedule-check cron (src/app/api/cron/schedule-check/route.ts) every
+  // 10 minutes - previously this field was saved but NEVER read by
+  // anything that actually triggers generation (confirmed 2026-09-02: no
+  // cron, no client polling, called it at all), so setting a time here did
+  // nothing. Fixed alongside this schema change.
+  label       String // e.g. "Hot News"
+  slots       Int       @default(1) // articles to generate per run, for `category` if set, or split across ALL categories if null
+  category    Category? // null = rotate across all 7 categories; a specific value = only that category
+  isActive    Boolean   @default(true)
+  lastRunDate String? // "YYYY-MM-DD" (site-local date) of the last successful run - prevents the cron re-triggering the same slot multiple times within its matching window on the same day
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@map("schedule_configs")
+}
+
+// One row per public search performed (src/app/search/page.tsx) - powers
+// the admin Metrics panel's "Most Searched" indicator. Never existed before
+// (search queries weren't tracked at all) - added 2026-09-02.
+model SearchQuery {
+  id          String   @id @default(uuid())
+  query       String
+  resultCount Int
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([query])
+  @@map("search_queries")
 }
 
 // Persistent memory for the newsroom AI agents (Wie/Audy/As/Wue) - DIY

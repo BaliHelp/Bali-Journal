@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
     const riskLevelParam = searchParams.get('riskLevel')
     const q = searchParams.get('q')?.trim()
 
-    const where: Record<string, unknown> = {}
+    // Excludes Trash by default everywhere this route is used (search,
+    // High Risk popup, legacy unfiltered listing) - trashed articles only
+    // show up in the dedicated Trash panel (/api/admin/articles/trash).
+    const where: Record<string, unknown> = { status: { not: 'TRASHED' } }
     if (riskLevelParam) {
       where.riskLevel = { in: riskLevelParam.split(',') }
     }

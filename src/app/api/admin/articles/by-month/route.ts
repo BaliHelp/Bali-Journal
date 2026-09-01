@@ -22,9 +22,11 @@ export async function GET(request: NextRequest) {
     const before = beforeParam ? new Date(beforeParam) : new Date()
 
     // Anchor: the most recent article older than the cursor - its month is
-    // the next month we should show.
+    // the next month we should show. Excludes Trash (status: TRASHED) - the
+    // normal Articles list shouldn't include deleted items, that's what the
+    // separate Trash panel is for.
     const anchor = await db.article.findFirst({
-        where: { createdAt: { lt: before } },
+        where: { createdAt: { lt: before }, status: { not: 'TRASHED' } },
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
     })
@@ -38,14 +40,14 @@ export async function GET(request: NextRequest) {
 
     const [articles, olderArticle] = await Promise.all([
         db.article.findMany({
-            where: { createdAt: { gte: monthStart, lt: monthEnd } },
+            where: { createdAt: { gte: monthStart, lt: monthEnd }, status: { not: 'TRASHED' } },
             orderBy: { createdAt: 'desc' },
             include: {
                 author: { select: { id: true, name: true, email: true } },
                 evidences: { select: { id: true } },
             },
         }),
-        db.article.findFirst({ where: { createdAt: { lt: monthStart } }, select: { id: true } }),
+        db.article.findFirst({ where: { createdAt: { lt: monthStart }, status: { not: 'TRASHED' } }, select: { id: true } }),
     ])
 
     return NextResponse.json({

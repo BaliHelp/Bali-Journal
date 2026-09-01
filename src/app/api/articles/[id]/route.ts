@@ -111,6 +111,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 }
 
+// Soft-delete: moves the article to Trash (status: TRASHED) instead of
+// deleting it immediately, per explicit request ("semua News yang di hapus
+// akan di tampung disitu sebelum benar-benar di hapus"). The old hard-delete
+// behavior now lives at DELETE /api/articles/[id]/permanent, only reachable
+// from within the Trash panel itself.
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const session = await getSession()
@@ -120,13 +125,24 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     const { id } = await params
 
-    // Delete related evidences first
-    await db.evidence.deleteMany({ where: { articleId: id } })
-    await db.comment.deleteMany({ where: { articleId: id } })
+    const article = await db.article.findUnique({ where: { id }, select: { status: true } })
+    if (!article) {
+      return NextResponse.json({ error: 'Article not found' }, { status: 404 })
+    }
+    if (article.status === 'TRASHED') {
+      return NextResponse.json({ error: 'Article is already in trash' }, { status: 400 })
+    }
 
-    await db.article.delete({ where: { id } })
+    const updated = await db.article.update({
+      where: { id },
+      data: {
+        status: 'TRASHED',
+        previousStatus: article.status,
+        deletedAt: new Date(),
+      },
+    })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, article: updated })
   } catch (error) {
     console.error('Delete article error:', error)
     return NextResponse.json({ error: 'Failed to delete article' }, { status: 500 })

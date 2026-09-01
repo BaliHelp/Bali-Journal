@@ -169,12 +169,17 @@ async function generateArticleContent(category: Category, avoidTitles: string[] 
     }
 }
 
-export async function generateNewsArticles(count: number = 3, authorId: string, status: Status = 'PUBLISHED') {
+export async function generateNewsArticles(
+    count: number = 3,
+    authorId: string,
+    status: Status = 'PUBLISHED',
+    categoryOverride?: Category
+) {
     const articles: any[] = []
 
     for (let i = 0; i < count; i++) {
         try {
-            const category = selectRandomCategory()
+            const category = categoryOverride ?? selectRandomCategory()
             const existingTitles = await getExistingTitlesForCategory(category)
 
             let generated = await generateArticleContent(category, existingTitles)

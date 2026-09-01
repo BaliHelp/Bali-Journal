@@ -30,10 +30,10 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json()
-        const { time, label, slots, isActive } = body
+        const { time, label, slots, isActive, category } = body
 
         const schedule = await db.scheduleConfig.create({
-            data: { time, label, slots, isActive }
+            data: { time, label, slots, isActive, category: category || null }
         })
 
         return NextResponse.json({ success: true, schedule })
@@ -49,11 +49,15 @@ export async function PUT(req: Request) {
         }
 
         const body = await req.json()
-        const { id, time, label, slots, isActive } = body
+        const { id, time, label, slots, isActive, category } = body
 
+        // Editing the time means "run at this new time" - reset lastRunDate
+        // so a schedule already triggered today at its OLD time can still
+        // fire (once) at the newly-set time today, instead of silently
+        // waiting until tomorrow.
         const schedule = await db.scheduleConfig.update({
             where: { id },
-            data: { time, label, slots, isActive }
+            data: { time, label, slots, isActive, category: category || null, lastRunDate: null }
         })
 
         return NextResponse.json({ success: true, schedule })
