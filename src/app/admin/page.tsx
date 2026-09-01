@@ -1369,6 +1369,21 @@ export default function MasterAdminDashboard() {
   }
 
 
+  // Patches one article in-place across every list that might be holding
+  // it (month-paginated view, search results, high-risk view) so the row
+  // reflects a repair's result immediately instead of needing a full
+  // refetch (fetchAllData() only refreshes the Overview aggregate counts,
+  // not these row-level lists).
+  function updateArticleInLists(id: string, patch: Partial<Article>) {
+    const apply = (list: Article[]) => list.map((a) => (a.id === id ? { ...a, ...patch } : a))
+    setMonthlyArticles(apply)
+    setSearchResults((prev) => (prev ? apply(prev) : prev))
+    setHighRiskList((prev) => (prev ? apply(prev) : prev))
+  }
+
+  const [repairPopupArticle, setRepairPopupArticle] = useState<Article | null>(null)
+  const [riskCheckResult, setRiskCheckResult] = useState<{ before: string; after: string; resolved: boolean; wasRewritten: boolean } | null>(null)
+
   async function handleRepairImage(id: string, title: string) {
     if (!confirm(`Regenerate image for "${title}"? This will replace the current image.`)) return
 
@@ -1378,10 +1393,35 @@ export default function MasterAdminDashboard() {
 
       if (!res.ok) throw new Error(data.error || 'Failed to repair image')
 
+      updateArticleInLists(id, { featuredImageUrl: data.imageUrl })
       setSuccess('Image repaired successfully!')
-      fetchAllData() // Refresh list to show new image (if we displayed thumbnails)
+      setRepairPopupArticle(null)
+      fetchAllData()
     } catch (err) {
       setError('Failed to repair image')
+    }
+  }
+
+  async function handleRepairRisk(id: string) {
+    setRiskCheckResult(null)
+    try {
+      const res = await fetch(`/api/articles/${id}/repair-risk`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to check legal risk')
+
+      updateArticleInLists(id, { riskLevel: data.after.riskLevel, riskScore: data.after.riskScore })
+      setRiskCheckResult({ before: data.before.riskLevel, after: data.after.riskLevel, resolved: data.resolved, wasRewritten: data.wasRewritten })
+
+      if (!data.wasRewritten) {
+        setSuccess(`Risiko saat ini: ${data.after.riskLevel} (${data.after.riskScore}). Tidak ada konten CRITICAL yang perlu diperbaiki.`)
+      } else if (data.resolved) {
+        setSuccess(`Risiko berhasil diturunkan dari ${data.before.riskLevel} ke ${data.after.riskLevel}. Artikel sudah bisa dipublikasikan.`)
+      } else {
+        setError(`Masih CRITICAL (${data.after.riskScore}) setelah 3 percobaan perbaikan - perlu diedit manual.`)
+      }
+      fetchAllData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to check legal risk')
     }
   }
 
@@ -2274,15 +2314,15 @@ export default function MasterAdminDashboard() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
-                              <AsyncButton
+                              <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleRepairImage(article.id, article.title)}
-                                title="Repair/Regenerate Image"
+                                onClick={() => { setRiskCheckResult(null); setRepairPopupArticle(article) }}
+                                title="Repair Image / Check Fatality"
                                 className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                               >
                                 <RefreshCw className="h-4 w-4" />
-                              </AsyncButton>
+                              </Button>
                               <Button variant="ghost" size="icon" onClick={() => openEditArticle(article)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -2324,6 +2364,63 @@ export default function MasterAdminDashboard() {
                 </Table>
               </CardContent>
             </Card>
+
+            <Dialog open={!!repairPopupArticle} onOpenChange={(open) => { if (!open) { setRepairPopupArticle(null); setRiskCheckResult(null) } }}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="line-clamp-2">{repairPopupArticle?.title}</DialogTitle>
+                  <DialogDescription>Pilih tindakan perbaikan untuk artikel ini.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="p-4 rounded-lg border space-y-2">
+                    <div className="flex items-center gap-2 font-medium">
+                      <RefreshCw className="h-4 w-4 text-blue-600" />
+                      Repair / Regenerate Image
+                    </div>
+                    <p className="text-sm text-muted-foreground">Ganti gambar utama artikel dengan gambar baru hasil AI.</p>
+                    <AsyncButton
+                      size="sm"
+                      variant="outline"
+                      onClick={() => repairPopupArticle && handleRepairImage(repairPopupArticle.id, repairPopupArticle.title)}
+                    >
+                      Regenerate Image
+                    </AsyncButton>
+                  </div>
+
+                  <div className="p-4 rounded-lg border space-y-2">
+                    <div className="flex items-center gap-2 font-medium">
+                      <ShieldAlert className="h-4 w-4 text-red-600" />
+                      Check Fatality (Legal Risk)
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Periksa ulang isi artikel. Kalau hasilnya CRITICAL, AI otomatis memperbaiki bagian yang bermasalah
+                      (hingga 3 percobaan) supaya risikonya turun dan artikel bisa dipublikasikan.
+                    </p>
+                    {repairPopupArticle && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Status saat ini:</span>
+                        <div className={`w-2 h-2 rounded-full ${riskColors[repairPopupArticle.riskLevel] ?? 'bg-gray-400'}`} />
+                        <span>{repairPopupArticle.riskLevel} ({repairPopupArticle.riskScore})</span>
+                      </div>
+                    )}
+                    <AsyncButton
+                      size="sm"
+                      variant="outline"
+                      onClick={() => repairPopupArticle && handleRepairRisk(repairPopupArticle.id)}
+                    >
+                      Check & Perbaiki Risiko
+                    </AsyncButton>
+                    {riskCheckResult && (
+                      <div className={`text-sm p-2 rounded ${riskCheckResult.resolved ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        {riskCheckResult.wasRewritten
+                          ? `${riskCheckResult.before} → ${riskCheckResult.after}${riskCheckResult.resolved ? ' - selesai, siap dipublikasikan.' : ' - masih CRITICAL, perlu edit manual.'}`
+                          : `Sudah dicek, risiko saat ini: ${riskCheckResult.after}. Tidak ada konten CRITICAL.`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="comments">

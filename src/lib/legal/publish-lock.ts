@@ -41,8 +41,17 @@ export async function checkPublishRequirements(articleId: string): Promise<Publi
     missingRequirements.push('Minimal 1 bukti pendukung wajib diunggah')
   }
 
-  // Check legal review requirement for high risk articles
-  if (article.riskLevel === 'HIGH' || article.riskLevel === 'CRITICAL') {
+  // CRITICAL is a hard block regardless of legal review sign-off - matches
+  // what the site's own Transparency page states ("Critical risk, cannot
+  // be published"). Bring it down via the Articles panel's "Check Fatality"
+  // action first.
+  if (article.riskLevel === 'CRITICAL') {
+    missingRequirements.push('Artikel berisiko CRITICAL tidak dapat dipublikasikan sampai risikonya diturunkan')
+  } else if (article.riskLevel === 'HIGH') {
+    // Legal review sign-off is set by the "Check Fatality" action in the
+    // admin Articles panel (src/app/api/articles/[id]/repair-risk) - before
+    // that existed, nothing in the codebase ever set these two fields, so
+    // every HIGH-risk article was permanently stuck here.
     if (!article.legalReviewedBy || !article.legalReviewedAt) {
       missingRequirements.push('Artikel berisiko tinggi memerlukan tinjauan hukum sebelum dipublikasikan')
     }
