@@ -156,6 +156,18 @@ export default async function HomePage() {
                         sizes="(min-width: 1024px) 800px, 100vw"
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                         priority
+                        // `priority` alone only tells Next to preload this
+                        // image (skip lazy-loading) - it does NOT set the
+                        // fetchpriority="high" attribute on the <img>/<link
+                        // rel=preload> in this Next.js version (confirmed by
+                        // reading node_modules/next/dist/shared/lib/get-img-
+                        // props.js: fetchPriority is a fully separate prop,
+                        // defaulting to undefined). Without it, the browser
+                        // schedules this LCP image's fetch at the same
+                        // priority as everything else on the page, instead
+                        // of ahead of it - PageSpeed Insights flagged this
+                        // exact gap on the hero/featured article image.
+                        fetchPriority="high"
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
