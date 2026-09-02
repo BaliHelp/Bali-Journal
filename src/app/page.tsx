@@ -32,16 +32,20 @@ const getLatestArticles = cache(async () => {
   })
 })
 
+// Was ordered by viewCount first (most-viewed article, effectively frozen
+// until something else out-viewed it) - switched to latest published so
+// the hero photo/headline actually changes as new news comes in, per
+// explicit request. No client-side rotation - this re-queries on every
+// request past the `revalidate = 60` ISR window, same mechanism the rest
+// of this page already relies on, so the hero simply reflects whatever
+// was most recently published as of the last regeneration.
 const getFeaturedArticle = cache(async () => {
   return db.article.findFirst({
     where: {
       status: 'PUBLISHED',
       riskLevel: { not: 'CRITICAL' }
     },
-    orderBy: [
-      { viewCount: 'desc' },
-      { publishedAt: 'desc' },
-    ],
+    orderBy: { publishedAt: 'desc' },
     include: {
       author: { select: { name: true } },
     },
@@ -103,6 +107,14 @@ export default async function HomePage() {
     getActiveAd('HOME_HERO_LEFT', 'DESKTOP'),
     getPopularArticlesForHome(),
   ])
+
+  // getFeaturedArticle() now picks the latest published article (see its
+  // definition above), same source getLatestArticles() draws from - so
+  // without this filter, the newest article would appear twice: once as
+  // the giant hero, then again as the very first row of this sidebar list.
+  const sidebarArticles = featuredArticle
+    ? latestArticles.filter((article) => article.id !== featuredArticle.id)
+    : latestArticles
 
   return (
     <div className="min-h-screen">
@@ -233,12 +245,12 @@ export default async function HomePage() {
                   <h2 className="text-lg font-semibold text-primary">Breaking News</h2>
                 </div>
                 <Badge variant="outline" className="text-xs">
-                  {latestArticles.length} Updates
+                  {sidebarArticles.length} Updates
                 </Badge>
               </div>
 
               <div className="overflow-y-auto h-[500px] lg:h-auto lg:flex-1 lg:min-h-0 pr-2 space-y-4 scrollbar-thin scrollbar-thumb-primary/20 hover:scrollbar-thumb-primary/40">
-                {latestArticles.map((article) => (
+                {sidebarArticles.map((article) => (
                   <Link
                     key={article.id}
                     href={`/article/${article.slug}`}
