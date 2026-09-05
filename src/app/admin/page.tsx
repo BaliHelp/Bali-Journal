@@ -262,6 +262,7 @@ interface Article {
   featuredImageUrl: string | null
   featuredImageAlt: string | null
   imageSource: string | null
+  sourceUrl: string | null
   aiAssisted: boolean
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
   riskScore: number
@@ -2382,6 +2383,30 @@ export default function MasterAdminDashboard() {
                             )}
                           </div>
                         </div>
+
+                        {/* Sumber Asli (internal) - only ever shown here and
+                            on localhost, never on the public article page
+                            (per explicit request 2026-09-06: sourceUrl can
+                            point at a competitor's article or a raw social
+                            media post used as sourcing, e.g. the Kotabunan
+                            citizen-quote pipeline - not something a reader
+                            should see, but editorial staff still need it to
+                            verify against the original). Read-only - it's
+                            populated by the generation/rewrite pipeline, not
+                            something typed in here. */}
+                        {editingArticle?.sourceUrl && (
+                          <div className="space-y-2 border-t pt-4">
+                            <Label className="text-sm text-muted-foreground">Sumber Asli (Internal - tidak tampil di halaman publik)</Label>
+                            <a
+                              href={editingArticle.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-sm underline hover:text-foreground break-all"
+                            >
+                              {editingArticle.sourceUrl}
+                            </a>
+                          </div>
+                        )}
 
                         {/* Konten */}
                         <div className="space-y-2 border-t pt-4">

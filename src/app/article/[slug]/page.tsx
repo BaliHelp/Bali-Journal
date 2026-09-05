@@ -331,13 +331,22 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             dangerouslySetInnerHTML={{ __html: article.content }}
           />
 
-          {/* Source Reference - shown for articles rewritten from an
-              external source (article.sourceUrl), so readers can verify
-              against the original reporting. rel=nofollow since this is
-              attribution, not an editorial endorsement/backlink. */}
-          {article.sourceUrl && (
+          {/* Source Reference - internal-only, per explicit request
+              (2026-09-06). Was shown to every reader as attribution for
+              articles rewritten from an external source, but sourceUrl
+              can point at a competitor's article, a raw Facebook/TikTok
+              post (e.g. the Kotabunan citizen-quote sourcing), or
+              otherwise reveal internal sourcing that shouldn't surface on
+              the public page. Now only rendered outside production
+              (`next dev` on localhost) - same NODE_ENV check already used
+              for other local-only behavior in this codebase (see
+              src/lib/db.ts). Still fully visible to editorial staff via
+              the Admin Dashboard's article edit dialog. rel=nofollow
+              since even here this is attribution, not an editorial
+              endorsement/backlink. */}
+          {article.sourceUrl && process.env.NODE_ENV !== 'production' && (
             <p className="mb-8 text-sm text-muted-foreground border-l-2 pl-4">
-              <LangText en="Source" id="Sumber" />:{' '}
+              <LangText en="Source" id="Sumber" /> <span className="italic">(dev only - hidden in production)</span>:{' '}
               <a
                 href={article.sourceUrl}
                 target="_blank"
