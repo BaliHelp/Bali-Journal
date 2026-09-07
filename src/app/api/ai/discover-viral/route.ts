@@ -4,6 +4,7 @@ import { myaiCompleteJSON, MYAI_FIELDS } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
 import { generateAndStoreImage } from '@/lib/images/image-service'
 import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
+import { getRecentTitlesForOpeningCheck, buildAvoidOpeningWordsRule } from '@/lib/ai/news-generator'
 import { getSession } from '@/lib/auth/session'
 
 export async function POST(req: NextRequest) {
@@ -42,6 +43,7 @@ Return ONLY a valid JSON object with this EXACT structure and nothing else:
         // hijacked/broken one as WIE (returns empty {} or a different
         // schema/language), same fix already applied to news-generator.ts/
         // rewrite-external-news.ts/process-raw-data.
+        const avoidOpeningWordsBlock = buildAvoidOpeningWordsRule(await getRecentTitlesForOpeningCheck())
         const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>('chatbot', [
             {
                 role: "system", content: `${AGENT_PERSONAS.WUE.instructions}
@@ -55,6 +57,7 @@ Topic: "${trendingTopic}"
 ${pickWritingStyle().rules}
 
 ${TITLE_DIVERSITY_RULES}
+${avoidOpeningWordsBlock}
 
 CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing else - no commentary before or after:
 {

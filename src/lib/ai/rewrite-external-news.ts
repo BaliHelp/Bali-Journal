@@ -4,6 +4,7 @@ import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
 import { generateAndStoreImage } from '@/lib/images/image-service'
 import type { GeneratorStrategy } from '@/lib/images/image-service'
 import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
+import { getRecentTitlesForOpeningCheck, buildAvoidOpeningWordsRule } from '@/lib/ai/news-generator'
 import type { Category } from '@prisma/client'
 
 export interface RewriteExternalNewsInput {
@@ -69,6 +70,7 @@ export async function rewriteExternalNewsToArticle(input: RewriteExternalNewsInp
     onProgress?.('Membuat berita baru...')
     const { getLegalPrecedentContext } = await import('@/lib/ai/memory')
     const legalPrecedents = await getLegalPrecedentContext(content.slice(0, 500))
+    const avoidOpeningWordsBlock = buildAvoidOpeningWordsRule(await getRecentTitlesForOpeningCheck())
 
     const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>('chatbot', [
         {
@@ -80,7 +82,8 @@ TASK: Read the provided HTML/text from a source URL. Extract the main news story
 
 ${pickWritingStyle().rules}
 
-${TITLE_DIVERSITY_RULES}${legalPrecedents}
+${TITLE_DIVERSITY_RULES}
+${avoidOpeningWordsBlock}${legalPrecedents}
 
 CRITICAL: Regardless of what language the source material is written in, you MUST write the
 article in English and respond with EXACTLY these JSON field names in English - never

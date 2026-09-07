@@ -96,6 +96,54 @@ export function findSimilarTitle(candidate: string, existingTitles: string[]): s
     return null
 }
 
+// ---------------------------------------------------------------------------
+// Opening-word repetition. TITLE_DIVERSITY_RULES (journalism-style.ts) rule
+// #3 tells the model to never open two consecutive headlines with the same
+// word ("Bali", "New", etc.) - but that instruction alone doesn't work,
+// because every generation call here is a separate, stateless API request
+// with no memory of what any OTHER call in the same batch produced. The
+// model has nothing real to check its own draft against, so it just falls
+// back to its single strongest default ("Bali's ...") on nearly every call -
+// confirmed as a real, near-universal pattern in the published backlog
+// (2026-09-08). Fixed by computing the actual opening words from REAL
+// recent titles and handing that list to the model as a concrete
+// constraint, instead of relying on it to enforce a vague rule with no data
+// to enforce it against.
+// ---------------------------------------------------------------------------
+
+/** Most recently created titles across ALL categories, most-recent-first - used only for buildAvoidOpeningWordsRule() below. Separate from getExistingTitlesForCategory(), which is per-category and used for topic-dedup, not opening-word variety (the "Bali's ..." pattern shows up across every category equally, so the signal needs to be site-wide, not category-scoped). */
+export async function getRecentTitlesForOpeningCheck(limit = 15): Promise<string[]> {
+    const recent = await db.article.findMany({
+        where: { status: { in: ['PUBLISHED', 'DRAFT'] } },
+        select: { title: true },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+    })
+    return recent.map((a) => a.title)
+}
+
+/** The actual set of banned opening words, shared between the prompt-text builder below and generateNewsArticles()'s real post-generation check - a prompt instruction alone was tested and found to only work ~2/3 of the time (the model still opened with a banned word on the remaining 1/3), so this same list also drives a real retry, not just a request. */
+export function getBannedOpeningWords(titles: string[], sampleSize = 15): Set<string> {
+    const firstWords = titles
+        .slice(0, sampleSize)
+        .map((t) => t.trim().split(/\s+/)[0]?.replace(/[^a-zA-Z']/g, ''))
+        .filter((w): w is string => !!w)
+    return new Set(firstWords.map((w) => w.toLowerCase()))
+}
+
+/** Builds a prompt block banning the new headline's first word from matching any of the most recent titles' first words. Returns '' if `titles` is empty (nothing to compare against yet). */
+export function buildAvoidOpeningWordsRule(titles: string[], sampleSize = 15): string {
+    const banned = getBannedOpeningWords(titles, sampleSize)
+    if (banned.size === 0) return ''
+    return `\n\nHEADLINE OPENING WORDS ALREADY USED (most recent headlines published/drafted on this outlet) - your new headline's FIRST WORD must be different from every one of these: ${[...banned].join(', ')}. This is a hard constraint, not a suggestion - if your first draft starts with one of these words (very likely "Bali" or "Bali's"), rewrite the opening using a different structural approach from the HEADLINE VARIETY list above (e.g. lead with the specific place, institution, number, or action instead).\n`
+}
+
+/** True if `title`'s first word is one of the recently-overused opening words - used to trigger a real retry, since the prompt instruction alone doesn't always get followed. */
+export function startsWithBannedWord(title: string, bannedWords: Set<string>): boolean {
+    const firstWord = title.trim().split(/\s+/)[0]?.replace(/[^a-zA-Z']/g, '').toLowerCase()
+    return !!firstWord && bannedWords.has(firstWord)
+}
+
 const CATEGORY_GUIDELINES = {
     TOURISM: 'tourism industry, hotels, festivals, cultural attractions, visitor experiences',
     GOVERNMENT: 'Bali provincial government policies, Governor statements, regulations, public services, key Jakarta updates affecting Bali',
@@ -106,10 +154,11 @@ const CATEGORY_GUIDELINES = {
     OPINION: 'expert commentary, cultural analysis, social issues, policy discussions',
 }
 
-async function generateArticleContent(category: Category, avoidTitles: string[] = []): Promise<GeneratedArticle> {
+export async function generateArticleContent(category: Category, avoidTitles: string[] = [], recentTitlesForOpening: string[] = []): Promise<GeneratedArticle> {
     const avoidBlock = avoidTitles.length
         ? `\n\nALREADY COVERED - DO NOT repeat these topics/angles, pick something genuinely different:\n${avoidTitles.map((t) => `- "${t}"`).join('\n')}\n`
         : ''
+    const avoidOpeningWordsBlock = buildAvoidOpeningWordsRule(recentTitlesForOpening)
 
     const prompt = `You are a Senior Investigative Journalist for Bali Journal, a prestigious English-language news outlet in Indonesia.
 
@@ -123,6 +172,7 @@ async function generateArticleContent(category: Category, avoidTitles: string[] 
     ${pickWritingStyle().rules}
 
     ${TITLE_DIVERSITY_RULES}
+    ${avoidOpeningWordsBlock}
 
     CONTENT RULES:
     - **REALISM**: Use REAL locations (specific streets in Canggu, offices in Renon, temples, etc.). Use REAL titles of officials (e.g., Governor, Head of Tourism Board).
@@ -181,27 +231,50 @@ export async function generateNewsArticles(
         try {
             const category = categoryOverride ?? selectRandomCategory()
             const existingTitles = await getExistingTitlesForCategory(category)
+            // Re-fetched every iteration (not once before the loop) so it
+            // self-corrects WITHIN a single batch too - if article #1 in
+            // this run opens with "Bali's ...", article #2's fetch already
+            // includes it and bans that opener again, not just across
+            // separate runs/days.
+            const recentTitlesForOpening = await getRecentTitlesForOpeningCheck()
 
-            let generated = await generateArticleContent(category, existingTitles)
+            const bannedOpeningWords = getBannedOpeningWords(recentTitlesForOpening)
+
+            let generated = await generateArticleContent(category, existingTitles, recentTitlesForOpening)
             let collision = findSimilarTitle(generated.title, existingTitles)
+            let bannedOpener = startsWithBannedWord(generated.title, bannedOpeningWords)
             let attempts = 1
 
-            // Retry with the colliding title(s) added to the avoid-list -
-            // this is what stops the model from just picking the same
-            // recurring angle again (e.g. "boost sustainable tourism") every
-            // time this category comes up.
+            // Retry on EITHER a topic collision (same angle already covered)
+            // or a banned opening word (the model ignored the prompt-level
+            // instruction and opened with "Bali's ..." anyway - confirmed
+            // via live testing this happens on roughly 1 in 3 calls even
+            // with the instruction present, so the instruction alone isn't
+            // enough; this makes it a real, enforced retry instead of just
+            // a request).
             const avoidList = [...existingTitles]
-            while (collision && attempts < MAX_TITLE_RETRY_ATTEMPTS) {
-                console.warn(`Title too similar to existing "${collision}" - retrying (attempt ${attempts + 1}/${MAX_TITLE_RETRY_ATTEMPTS})`)
+            while ((collision || bannedOpener) && attempts < MAX_TITLE_RETRY_ATTEMPTS) {
+                console.warn(
+                    collision
+                        ? `Title too similar to existing "${collision}" - retrying (attempt ${attempts + 1}/${MAX_TITLE_RETRY_ATTEMPTS})`
+                        : `Title opens with an overused word ("${generated.title.split(/\s+/)[0]}") - retrying (attempt ${attempts + 1}/${MAX_TITLE_RETRY_ATTEMPTS})`
+                )
                 avoidList.push(generated.title)
-                generated = await generateArticleContent(category, avoidList)
+                generated = await generateArticleContent(category, avoidList, recentTitlesForOpening)
                 collision = findSimilarTitle(generated.title, avoidList)
+                bannedOpener = startsWithBannedWord(generated.title, bannedOpeningWords)
                 attempts++
             }
 
             if (collision) {
                 console.error(`Skipping article: could not produce a distinct title after ${MAX_TITLE_RETRY_ATTEMPTS} attempts (still similar to "${collision}")`)
                 continue
+            }
+            if (bannedOpener) {
+                // Not worth skipping the whole article over - a repeated
+                // opening word is a style nit, not a duplicate/quality
+                // problem. Log it and let the article through as-is.
+                console.warn(`Publishing "${generated.title}" despite an overused opening word after ${MAX_TITLE_RETRY_ATTEMPTS} attempts - style nit, not blocking.`)
             }
 
             // Proper legal-risk analysis (categories + recommendations),

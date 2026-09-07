@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { generateAndStoreImage } from '@/lib/images/image-service'
 import { TITLE_DIVERSITY_RULES, pickWritingStyle } from '@/lib/ai/journalism-style'
+import { getRecentTitlesForOpeningCheck, buildAvoidOpeningWordsRule } from '@/lib/ai/news-generator'
 
 export async function POST(request: Request) {
     try {
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
         // by analyzeLegalRisk() afterward.
         const { getLegalPrecedentContext } = await import('@/lib/ai/memory')
         const legalPrecedents = await getLegalPrecedentContext(content.slice(0, 500))
+        const avoidOpeningWordsBlock = buildAvoidOpeningWordsRule(await getRecentTitlesForOpeningCheck())
 
         const result = await myaiCompleteJSON('chatbot', [
             {
@@ -41,7 +43,8 @@ export async function POST(request: Request) {
 
                 ${pickWritingStyle().rules}
 
-                ${TITLE_DIVERSITY_RULES}${legalPrecedents}
+                ${TITLE_DIVERSITY_RULES}
+                ${avoidOpeningWordsBlock}${legalPrecedents}
 
                 CRITICAL: Regardless of what language the raw data below is written in (it may be
                 Indonesian), you MUST write the article in English and respond with EXACTLY these

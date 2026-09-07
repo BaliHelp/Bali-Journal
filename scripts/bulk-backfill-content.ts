@@ -40,7 +40,7 @@
  */
 import { db } from '@/lib/db'
 import { rewriteExternalNewsToArticle } from '@/lib/ai/rewrite-external-news'
-import { findSimilarTitle, getExistingTitlesForCategory } from '@/lib/ai/news-generator'
+import { findSimilarTitle, getExistingTitlesForCategory, getRecentTitlesForOpeningCheck, buildAvoidOpeningWordsRule } from '@/lib/ai/news-generator'
 import { IMAGE_STRATEGIES } from '@/lib/images/image-service'
 import { myaiCompleteJSON } from '@/lib/ai/myaiClient'
 import { AGENT_PERSONAS } from '@/lib/ai/gemini-client'
@@ -109,6 +109,7 @@ function isGenericListingUrl(url: string): boolean {
 
 /** Fallback path when the source URL can't be fetched/extracted (e.g. a bare /news/ index page, not a permalink) - generate from the title+description we already have instead of dropping the topic. */
 async function generateFromRawSummary(item: BacklogItem, status: 'PUBLISHED' | 'DRAFT', publishedAt: Date | null) {
+    const avoidOpeningWordsBlock = buildAvoidOpeningWordsRule(await getRecentTitlesForOpeningCheck())
     const articleData = await myaiCompleteJSON<{ title: string; excerpt?: string; content?: string; riskLevel?: string }>('chatbot', [
         {
             role: 'system', content: `${AGENT_PERSONAS.WIE.instructions}
@@ -122,6 +123,7 @@ CRITICAL: Bali Journal is an English-language outlet - you MUST write the title,
 ${pickWritingStyle().rules}
 
 ${TITLE_DIVERSITY_RULES}
+${avoidOpeningWordsBlock}
 
 Return ONLY a valid JSON object with this EXACT structure and nothing else:
 {
