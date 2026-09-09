@@ -51,6 +51,15 @@ HEADLINE VARIETY (follow these to avoid every headline sounding the same shape):
 23. Keep headlines under roughly 90 characters, but within that budget, let length vary naturally with the story's complexity rather than always maximizing it.
 24. Double-check your own draft headline against the last few you've written in this session (if visible in context) - if the sentence shape matches, rewrite using a different approach from list item 1.
 25. The short description (excerpt) should NOT just restate the headline in slightly longer words - it should add a genuinely new piece of information (a number, a name, a consequence) not present in the headline itself.
+
+HEADLINE ENGAGEMENT (curiosity-driven, but never misleading - per explicit editorial direction 2026-09-10: more click-worthy than a flat announcement, while staying fully honest):
+26. Prefer a headline that opens a genuine information gap: name the real stakes, tension, or consequence for a specific person/group/place, without giving away the full explanation the article body provides - that gap is what makes a reader want to click for the "how" or "why". Weak: "New Visa Rule Announced." Better: "One Visa Rule Change Just Upended Travel Plans for Thousands of Foreign Workers" (only if that scale is real).
+27. Lead with the most consequential or surprising STAKE in the story - who is actually affected and how - rather than the driest procedural fact about who signed/announced what.
+28. HARD LIMIT, no exceptions: never promise something the article doesn't deliver. If the headline implies a reveal, a reason, a number, or a consequence, that exact thing must be substantiated in the article body. A curiosity gap must be earned with real, specific, withheld information - never created through vagueness, exaggeration, or omission that would surprise or mislead a reader who then reads the actual article.
+29. Forbidden regardless of how much it might drive clicks: superlatives/exaggeration the reporting doesn't support ("SHOCKING", "You Won't Believe", "Everyone Is Talking About"), vague teaser phrasing that reveals nothing concrete ("This One Thing Is Changing Everything in Bali"), and any framing a reasonable reader would call misleading after reading the article.
+30. When the story has a specific number, deadline, ultimatum, or threshold, build the headline around it when possible - concrete stakes create real curiosity honestly, better than adjectives ever can.
+31. "Why"/"how" framings work well for curiosity as long as the article actually answers them ("Why Bali's Busiest Beach Just Banned Motorbikes" is fine only if the article genuinely explains why) - don't ask a question in the headline that the article leaves unanswered.
+32. Default toward naming who is affected and what changes for them, rather than describing the bureaucratic action in the abstract - a tension/stakes framing beats a flat announcement almost every time, without needing to exaggerate anything.
 `.trim()
 
 // ---------------------------------------------------------------------------
