@@ -421,6 +421,7 @@ export default function MasterAdminDashboard() {
   const [highRiskLoading, setHighRiskLoading] = useState(false)
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(false)
+  const [imageHealth, setImageHealth] = useState<{ healthy: boolean; consecutiveNonGemini: number; lastGeminiSuccessAt: string | null; sampledCount: number } | null>(null)
   const [trashList, setTrashList] = useState<Article[] | null>(null)
   const [trashLoading, setTrashLoading] = useState(false)
   const [agentMemories, setAgentMemories] = useState<AgentMemoryItem[] | null>(null)
@@ -851,6 +852,11 @@ export default function MasterAdminDashboard() {
     if ((activeTab === 'metrics' || activeTab === 'overview') && !metrics && !metricsLoading) {
       fetchMetrics()
     }
+    // Only on Overview, and only once per admin session load - a lightweight
+    // health check, not something that needs re-fetching on every tab visit.
+    if (activeTab === 'overview' && !imageHealth) {
+      fetchImageHealth()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
@@ -1194,6 +1200,15 @@ export default function MasterAdminDashboard() {
       console.error('Failed to load metrics:', err)
     } finally {
       setMetricsLoading(false)
+    }
+  }
+
+  async function fetchImageHealth() {
+    try {
+      const res = await fetch('/api/admin/image-health')
+      if (res.ok) setImageHealth(await res.json())
+    } catch (err) {
+      console.error('Failed to load image generator health:', err)
     }
   }
 
@@ -1869,6 +1884,38 @@ export default function MasterAdminDashboard() {
                 <h2 className="text-xl font-semibold">Welcome back, Admin</h2>
                 <p className="text-sm text-muted-foreground">Here is what's happening on Bali Journal today.</p>
               </div>
+
+              {/* Image generator health warning - added 2026-09-10 after a
+                  confirmed 5-day silent outage: Gemini (2/3 of the image
+                  rotation) failed on every single article because both
+                  funded API keys hit their Google AI Studio monthly
+                  spending cap, and the pool's fallback-to-Pollinations
+                  design (correctly) kept the site running without ever
+                  surfacing the problem anywhere. This is that surface. */}
+              {imageHealth && !imageHealth.healthy && (
+                <Card className="border-destructive/50 bg-destructive/5">
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-destructive">Gemini gagal generate gambar {imageHealth.consecutiveNonGemini} artikel terakhir berturut-turut</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Situs tetap jalan normal (otomatis jatuh ke Pollinations), tapi ini biasanya berarti kedua API key Gemini yang berbayar (KEY1/KEY4) kena batas pengeluaran bulanan di Google AI Studio.{' '}
+                        {imageHealth.lastGeminiSuccessAt
+                          ? `Terakhir kali Gemini berhasil: ${new Date(imageHealth.lastGeminiSuccessAt).toLocaleString('id-ID', { timeZone: 'Asia/Makassar' })} WITA.`
+                          : `Tidak ada Gemini yang berhasil dalam ${imageHealth.sampledCount} artikel terakhir yang dicek.`}
+                      </p>
+                      <a
+                        href="https://ai.studio/spend"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs underline text-destructive font-medium mt-1 inline-block"
+                      >
+                        Cek/naikkan batas pengeluaran di ai.studio/spend →
+                      </a>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Most Viewed Article - added per request, above Quick Stats */}
               {metrics && metrics.topViewed.length > 0 && (

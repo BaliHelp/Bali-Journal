@@ -1,4 +1,5 @@
 import { uploadImage } from '@/lib/storage/upload-image'
+import { db } from '@/lib/db'
 
 /**
  * Centralised image pipeline for Bali Journal.
@@ -515,6 +516,71 @@ export async function generateAndStoreImage(
 
     console.error(`All image sources failed for: "${title}"`)
     return { localPath: null, source: 'Generation Failed' }
+}
+
+// ---------------------------------------------------------------------------
+// Generator health - GENERATOR_POOL silently falls back to Pollinations
+// whenever Gemini fails (wrong API key missing, quota, billing), which is
+// exactly the intended safety net (the site never breaks), but it also
+// means a real problem stays invisible until someone happens to notice the
+// image QUALITY difference. Confirmed as a real 5-day-long silent outage
+// (2026-09-05 06:00 onward): both funded Gemini keys hit their Google AI
+// Studio MONTHLY SPENDING CAP (verified via a direct API call - a billing
+// issue at Google's end, fixable only at https://ai.studio/spend, not a
+// code bug), and every single image since then quietly came from
+// Pollinations instead. This computes that same signal from imageSource on
+// recent articles - the one existing enum already used to log the DB
+// wrong. Used to warn in the Admin Dashboard instead of solely inferring.
+// ---------------------------------------------------------------------------
+
+export interface ImageGeneratorHealth {
+    /** False once `consecutiveNonGemini` crosses the threshold below - i.e. Gemini's 2-in-3 rotation slots have been failing over and NOT just losing the dice roll. */
+    healthy: boolean
+    /** How many of the most recent AI-generated images in a row did NOT come from Gemini, counting back from the newest. */
+    consecutiveNonGemini: number
+    /** When Gemini last actually produced an image, or null if none in the sample window at all. */
+    lastGeminiSuccessAt: Date | null
+    sampledCount: number
+}
+
+// GENERATOR_POOL is 2 Gemini : 1 Pollinations - across 12 real attempts,
+// the odds of Gemini's own dice roll losing 12 times in a row by chance
+// alone are astronomically small (Pollinations only gets picked 1/3 of the
+// time to begin with), so 12 is a safe threshold that essentially never
+// false-positives on bad luck, while still catching a real outage well
+// before it goes unnoticed for days.
+const UNHEALTHY_THRESHOLD = 12
+
+export async function getImageGeneratorHealth(sampleSize = 30): Promise<ImageGeneratorHealth> {
+    const recent = await db.article.findMany({
+        where: { status: { not: 'TRASHED' }, imageSource: { not: null } },
+        select: { imageSource: true, createdAt: true },
+        take: sampleSize,
+        orderBy: { createdAt: 'desc' },
+    })
+
+    // "Manual Upload" (an editor replacing the photo by hand, see
+    // admin/page.tsx's "Foto Utama" flow) never went through GENERATOR_POOL
+    // at all - skip it rather than counting it as a failed Gemini turn,
+    // or an editor's manual uploads would falsely look like an outage.
+    const poolAttempts = recent.filter((a) => a.imageSource !== 'Manual Upload')
+
+    let consecutiveNonGemini = 0
+    let lastGeminiSuccessAt: Date | null = null
+    for (const article of poolAttempts) {
+        if (article.imageSource?.includes('Gemini')) {
+            lastGeminiSuccessAt = article.createdAt
+            break
+        }
+        consecutiveNonGemini++
+    }
+
+    return {
+        healthy: consecutiveNonGemini < UNHEALTHY_THRESHOLD,
+        consecutiveNonGemini,
+        lastGeminiSuccessAt,
+        sampledCount: poolAttempts.length,
+    }
 }
 
 // ---------------------------------------------------------------------------
