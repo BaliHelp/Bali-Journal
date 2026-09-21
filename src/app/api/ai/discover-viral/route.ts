@@ -100,6 +100,7 @@ CRITICAL: Return ONLY a valid JSON object with this EXACT structure and nothing 
                 featuredImageUrl: storedImage.localPath,
                 featuredImageAlt: articleData.title,
                 imageSource: storedImage.source,
+                imageHash: storedImage.hash,
                 verificationLevel: 'LOW' // Viral is risky
             }
         })

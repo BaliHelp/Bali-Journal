@@ -347,6 +347,7 @@ export async function generateNewsArticles(
                     featuredImageUrl: stored.localPath, // null only if every source failed
                     featuredImageAlt: generated.title,
                     imageSource: stored.source,
+                    imageHash: stored.hash,
                     aiAssisted: true, // Mark as AI-generated
                     riskLevel: riskAnalysis.riskLevel,
                     riskScore: riskAnalysis.riskScore,

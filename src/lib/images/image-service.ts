@@ -1,5 +1,6 @@
 import { uploadImage } from '@/lib/storage/upload-image'
 import { db } from '@/lib/db'
+import { createHash } from 'node:crypto'
 
 /**
  * Centralised image pipeline for Bali Journal.
@@ -30,6 +31,31 @@ export interface StoredImage {
     localPath: string | null
     /** Human-readable provenance stored in Article.imageSource */
     source: string
+    /** SHA-256 of the raw image bytes, or null if generation failed - callers should save this to Article.imageHash so future calls can detect a repeat. */
+    hash: string | null
+}
+
+function hashImageBuffer(buffer: Buffer): string {
+    return createHash('sha256').update(buffer).digest('hex')
+}
+
+/**
+ * How many recent articles' imageHash to compare a new candidate against.
+ * Fallback duplication (see the schema comment on Article.imageHash) shows
+ * up in bursts across a handful of consecutive articles, not far apart in
+ * time - 50 comfortably covers a day or two of normal generation volume
+ * without the query getting expensive.
+ */
+const RECENT_HASH_WINDOW = 50
+
+async function getRecentImageHashes(): Promise<Set<string>> {
+    const recent = await db.article.findMany({
+        where: { status: { not: 'TRASHED' }, imageHash: { not: null } },
+        select: { imageHash: true },
+        take: RECENT_HASH_WINDOW,
+        orderBy: { createdAt: 'desc' },
+    })
+    return new Set(recent.map((a) => a.imageHash as string))
 }
 
 function cleanPromptText(input: string, max = 60): string {
@@ -354,12 +380,31 @@ const LOREMFLICKR_FALLBACK = (cleanTitle: string): ImageCandidate =>
         'Stock Photo (LoremFlickr)'
     )
 
+// Last-resort, last-resort fallback. LoremFlickr's `lock=` seed only varies
+// WHICH of the (sometimes very few) photos matching its keyword tags gets
+// served - for generic/abstract extracted keywords, that pool can be thin
+// enough that many different seeds/keyword-pairs all land on the same
+// literal photo (confirmed 2026-09-22: one unrelated stock photo reused
+// across 6+ articles - see the recent-duplicate guard in
+// generateAndStoreImage()). Picsum's `/seed/<n>/` isn't a tag search at
+// all - each distinct seed number deterministically maps to a different
+// photo from its whole library, so it can't collide the way LoremFlickr
+// does. Trade-off: zero topical relevance to the article (purely random
+// stock photography) - only used if EVERY topically-relevant candidate
+// above it (AI-generated, then LoremFlickr) failed or turned out to be a
+// duplicate, so an article still gets *some* distinct photo instead of
+// none. Already allow-listed in next.config.ts's images.remotePatterns,
+// just never actually wired into a candidate chain until now.
+const PICSUM_FALLBACK = (): ImageCandidate =>
+    urlCandidate(`https://picsum.photos/seed/${randomSeed()}/1200/800`, 'Stock Photo (Picsum)')
+
 const pollinationsStrategy: GeneratorStrategy = {
     name: 'pollinations',
     buildCandidates: (prompt, cleanTitle) => [
         urlCandidate(buildPollinationsUrl(prompt), 'AI-Generated Illustration'),
         urlCandidate(buildPollinationsUrl(`bali news ${cleanTitle}`), 'AI-Generated Illustration'),
         LOREMFLICKR_FALLBACK(cleanTitle),
+        PICSUM_FALLBACK(),
     ],
 }
 
@@ -376,6 +421,7 @@ const geminiStrategy: GeneratorStrategy = {
         },
         urlCandidate(buildPollinationsUrl(prompt), 'AI-Generated Illustration'),
         LOREMFLICKR_FALLBACK(cleanTitle),
+        PICSUM_FALLBACK(),
     ],
 }
 
@@ -394,6 +440,7 @@ const unsplashStrategy: GeneratorStrategy = {
         },
         urlCandidate(buildPollinationsUrl(prompt), 'AI-Generated Illustration'),
         LOREMFLICKR_FALLBACK(cleanTitle),
+        PICSUM_FALLBACK(),
     ],
 }
 
@@ -486,9 +533,26 @@ export async function generateAndStoreImage(
     const strategy = nextGeneratorStrategy(pool)
     candidates.push(...strategy.buildCandidates(prompt, cleanTitle))
 
+    // Recent-duplicate guard - confirmed real bug (2026-09-22): when both
+    // Gemini and Pollinations are down, the LoremFlickr fallback's keyword-
+    // tag search has such a thin matching pool for generic/abstract
+    // extracted keywords that unrelated articles converge on the exact same
+    // stock photo (one Turkish street-cat-statue photo reused across 6+
+    // completely unrelated articles, confirmed byte-identical). LoremFlickr
+    // returns a real 200 + valid image bytes in this failure mode - nothing
+    // else here would ever catch it. Fetched once per call, not per
+    // candidate, to keep this to one extra query per article.
+    const recentHashes = await getRecentImageHashes()
+
     for (const candidate of candidates) {
         const downloaded = await candidate.fetch()
         if (!downloaded) continue
+
+        const hash = hashImageBuffer(downloaded.buffer)
+        if (recentHashes.has(hash)) {
+            console.warn(`Discarded image candidate (${candidate.label}) - byte-identical to a recently used image (likely a thin-pool stock fallback collision)`)
+            continue
+        }
 
         // NSFW gate - verify the actual pixels before this ever touches
         // disk/the DB. Fails closed: any error here (network, no key, quota)
@@ -508,14 +572,14 @@ export async function generateAndStoreImage(
                 downloaded.contentType,
                 cleanTitle
             )
-            return { localPath, source: candidate.label }
+            return { localPath, source: candidate.label, hash }
         } catch (error) {
             console.error('Failed to persist image file:', error)
         }
     }
 
     console.error(`All image sources failed for: "${title}"`)
-    return { localPath: null, source: 'Generation Failed' }
+    return { localPath: null, source: 'Generation Failed', hash: null }
 }
 
 // ---------------------------------------------------------------------------

@@ -111,6 +111,7 @@ export async function POST(request: Request) {
                 featuredImageUrl: storedImage.localPath,
                 featuredImageAlt: result.title,
                 imageSource: storedImage.source,
+                imageHash: storedImage.hash,
                 aiAssisted: true,
                 riskLevel,
                 status: autoPublish ? 'PUBLISHED' : 'DRAFT',

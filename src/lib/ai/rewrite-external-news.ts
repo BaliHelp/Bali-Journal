@@ -133,6 +133,7 @@ else - no commentary before or after:
             featuredImageUrl: storedImage.localPath,
             featuredImageAlt: articleData.title,
             imageSource: storedImage.source,
+            imageHash: storedImage.hash,
             sourceUrl: url,
             verificationLevel: 'MEDIUM',
             riskLevel,

@@ -101,6 +101,18 @@ model Article {
   featuredImageUrl    String?
   featuredImageAlt    String?
   imageSource         String?
+  // SHA-256 of the featured image's raw bytes - lets generateAndStoreImage()
+  // detect "this exact file was already used on a recent article" and
+  // reject it as a duplicate candidate. Added 2026-09-22 after a confirmed
+  // bug: when both Gemini and Pollinations fail, the LoremFlickr fallback's
+  // keyword-tag search often has such a thin matching photo pool for
+  // generic/abstract keywords that unrelated articles converge on the
+  // SAME literal stock photo (observed: a Turkish street-cat-statue photo
+  // reused across at least 6 unrelated articles - agriculture policy,
+  // emergency preparedness, tourism, etc.). LoremFlickr itself returns a
+  // valid 200 + real image bytes in this failure mode, so there's no
+  // error to catch - only a hash comparison catches it.
+  imageHash           String?
   sourceUrl           String? // External source URL for rewritten articles
   aiAssisted          Boolean         @default(false)
   riskLevel           RiskLevel       @default(LOW)
